@@ -1,0 +1,14 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary/editor files
+*.log
+*.tmp
+
+# Cloudflare local cache
+.wrangler/
+
+# Local environment files
+.env
+.env.*
