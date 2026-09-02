@@ -14,13 +14,8 @@ Open `index.html` in a browser, or serve the folder with a simple local static s
 
 ## Deployment
 
-This project is deployed to Cloudflare Pages.
-
-Example:
-
-```bash
-npx wrangler@latest pages deploy . --project-name=jussivirta --branch main --commit-dirty=true
-```
+This project is deployed to Cloudflare Pages through its GitHub integration.
+The `main` branch is deployed from the project root without a build step.
 
 ## Notes
 

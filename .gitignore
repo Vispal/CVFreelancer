@@ -6,9 +6,6 @@ Thumbs.db
 *.log
 *.tmp
 
-# Cloudflare local cache
-.wrangler/
-
 # Local environment files
 .env
 .env.*
