@@ -8,7 +8,7 @@ import { tulkitse, ehdokkaat, sydanValiin, KIITOS } from './vastaukset.js';
 
 const ASETUKSET = {
   alkuviive: 4000, // ms sivun latautumisesta ensimmäiseen kuvaan
-  tauko: [8000, 15000], // ms kuvien välillä
+  tauko: [4000, 8000], // ms kuvien välillä
   enintaan: 8, // kuvaa per käynti
   koko: [56, 110], // px
   kaanto: 10, // ± astetta
@@ -21,7 +21,7 @@ const ASETUKSET = {
   enintaanViivoja: 300, // kävijän viivoja sivulla; vanhimmat häivytetään
   ohjaimet: false, // alatunnisteen vihje sekä pyyhi- ja hiljaa-painikkeet; piilotettu toistaiseksi
   vastausviive: [1500, 3000], // ms kävijän viimeisestä viivasta piirtäjän vastaukseen
-  keskustelutauko: 20000, // ms: piirtäjän omat kuvat odottavat näin kauan kävijän viimeisestä viivasta
+  keskustelutauko: 15000, // ms: piirtäjän omat kuvat odottavat näin kauan kävijän viimeisestä viivasta
   enintaanVastauksia: 10, // sen jälkeen piirtäjä kirjoittaa "kiitos!" ja lopettaa vastaamisen
 };
 
