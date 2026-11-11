@@ -1,4 +1,4 @@
-// Etusivun "salaperäinen piirtäjä": hetken kuluttua sivun avaamisesta punainen kynä piirtää ruutupaperille pieniä
+// Etusivun "salaperäinen piirtäjä": hetken kuluttua sivun avaamisesta kynä piirtää ruutupaperille pieniä
 // kuvia (tähti, kissa, hymiö...). Vain työpöydällä hiirellä, ei kun käyttäjä on pyytänyt vähemmän liikettä.
 // Kortit, logo ja alatunniste jätetään aina rauhaan. Ei evästeitä, ei tallennusta, ei verkkopyyntöjä.
 import { SHAPES } from './shapes.js';
@@ -13,7 +13,7 @@ const ASETUKSET = {
   nosto: 170, // ms kynän nosto viivojen välillä
   reunus: 24, // px tyhjää suojattujen alueiden ja ruudun reunan ympärillä
   ruutu: 24, // ruutupaperin ruudun koko
-  heilunta: 1.3, // px käsialan heilunta
+  heilunta: 0.45, // px käsialan heilunta
 };
 
 const SUOJATUT = '.choice, header .logo, header small, footer .wrap > *';
@@ -241,7 +241,7 @@ function piirraKuva() {
     return [cx + dx * cos - dy * sin, cy + dx * sin + dy * cos];
   };
 
-  const g = el('g', { class: 'piirros', 'data-kuva': kuva.nimi, 'stroke-width': satunnainen(1.8, 2.4).toFixed(2) });
+  const g = el('g', { class: 'piirros', 'data-kuva': kuva.nimi, 'stroke-width': satunnainen(3.2, 3.8).toFixed(2) });
   kerros.insertBefore(g, kyna);
   piirretyt.push({ g, laatikko });
 
@@ -313,7 +313,7 @@ function teeKyna() {
   const sisa = el('g', { transform: 'rotate(-48)' });
   sisa.append(
     el('path', { d: 'M0 0 L8 -3.2 L8 3.2 Z', fill: '#E9CFA6', stroke: '#33383E', 'stroke-width': '1' }),
-    el('path', { d: 'M0 0 L3 -1.2 L3 1.2 Z', fill: '#C8372F' }),
+    el('path', { d: 'M0 0 L3 -1.2 L3 1.2 Z', fill: '#1B1D20' }),
     el('rect', { x: '8', y: '-3.2', width: '20', height: '6.4', fill: '#C8372F', stroke: '#33383E', 'stroke-width': '1' }),
     el('rect', { x: '28', y: '-3.2', width: '3', height: '6.4', fill: '#B9BEC4', stroke: '#33383E', 'stroke-width': '1' }),
     el('rect', { x: '31', y: '-3.2', width: '4.5', height: '6.4', rx: '1.5', fill: '#FFB3C6', stroke: '#33383E', 'stroke-width': '1' })
