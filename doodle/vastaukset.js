@@ -798,6 +798,71 @@ Object.assign(VASTAUKSET, {
   },
 });
 
+// Kärki alaspäin osoittava kolmio (▽): kärki ja yläreunan päät, tai null.
+function kolmioAlas(p) {
+  if (p.monikulmio?.nimi !== 'kolmio') return null;
+  const k = p.monikulmio.kulmat.slice().sort((a, b) => b[1] - a[1]);
+  const [karki, ...yla] = k;
+  if (yla.some((q) => q[1] > karki[1] - 0.4 * p.h)) return null;
+  const [vas, oik] = yla.sort((a, b) => a[0] - b[0]);
+  return { karki, vas, oik };
+}
+const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+const polyline = (pisteet) => 'M' + pisteet.map((q) => `${f(q[0])} ${f(q[1])}`).join(' L');
+
+Object.assign(VASTAUKSET, {
+  // Jäätelötötterö: kaksi palloa, kirsikka ja vohvelikuvio.
+  jaatelo(p) {
+    const k = kolmioAlas(p);
+    if (!k) return null;
+    const { karki: C, vas: A, oik: B } = k;
+    const osat = [];
+    // Vohvelikuvio: viivat tötterön sivujen suuntaisesti (Thaleen lauseella yläreunalta toiselle sivulle).
+    for (const u of [0.33, 0.66]) {
+      const T = lerp(A, B, u);
+      osat.push({ d: polyline([T, lerp(B, C, 1 - u)]) }, { d: polyline([T, lerp(A, C, u)]) });
+    }
+    const keski = lerp(A, B, 0.5);
+    const r = Math.hypot(B[0] - A[0], B[1] - A[1]) / 2 + 4;
+    const pallo = (cx, y, r) => `M${f(cx - r)} ${f(y)} C${f(cx - r)} ${f(y - 1.33 * r)} ${f(cx + r)} ${f(y - 1.33 * r)} ${f(cx + r)} ${f(y)}`;
+    osat.push({ d: pallo(keski[0], keski[1] + 2, r) });
+    const r2 = r * 0.78, y2 = keski[1] - r * 0.8;
+    osat.push({ d: pallo(keski[0], y2, r2) });
+    const kirsikka = [keski[0], y2 - r2 - 6];
+    osat.push(
+      { d: ympyraPolku(kirsikka[0], kirsikka[1], 6) },
+      { d: `M${f(kirsikka[0] + 1)} ${f(kirsikka[1] - 6)} Q${f(kirsikka[0] + 3)} ${f(kirsikka[1] - 16)} ${f(kirsikka[0] + 11)} ${f(kirsikka[1] - 20)}` },
+    );
+    return osat;
+  },
+  // Pizzapala: reunus yläreunaan, pepperonit ja juustoa valumassa kärjestä.
+  pizza(p) {
+    const k = kolmioAlas(p);
+    if (!k) return null;
+    const { karki: C, vas: A, oik: B } = k;
+    const leveys = Math.hypot(B[0] - A[0], B[1] - A[1]);
+    // Reunus: aaltoileva viiva hieman yläreunan yläpuolella.
+    const reunus = [A];
+    for (let i = 1; i < 12; i++) {
+      const q = lerp(A, B, i / 12);
+      reunus.push([q[0], q[1] - 9 - Math.sin((i / 12) * Math.PI * 6) * 2]);
+    }
+    reunus.push(B);
+    const osat = [{ d: polyline(reunus) }];
+    const r = Math.max(5, Math.min(10, leveys * 0.075));
+    const kohta = (a, b, c) => [A[0] * a + B[0] * b + C[0] * c, A[1] * a + B[1] * b + C[1] * c];
+    for (const [a, b, c, s] of [[0.55, 0.3, 0.15, 1], [0.2, 0.62, 0.18, 0.9], [0.36, 0.24, 0.4, 0.8], [0.18, 0.3, 0.52, 0.65]]) {
+      const q = kohta(a, b, c);
+      osat.push({ d: ympyraPolku(q[0], q[1], r * s) });
+    }
+    // Juustotippa roikkuu kyljestä lähellä kärkeä.
+    const kylki = Math.random() < 0.5 ? A : B;
+    const [t1, t2] = [lerp(kylki, C, 0.62), lerp(kylki, C, 0.74)];
+    osat.push({ d: `M${f(t1[0])} ${f(t1[1])} C${f(t1[0])} ${f(t1[1] + 22)} ${f(t2[0])} ${f(t2[1] + 22)} ${f(t2[0])} ${f(t2[1])}` });
+    return osat;
+  },
+});
+
 // Mitkä vastaukset sopivat millekin piirrokselle, suosituimmuusjärjestyksessä (satunnaistetaan doodle.js:ssä).
 const SOPIVAT = {
   silmukka: ['kasvot', 'kissa', 'aurinko', 'ilmapallo'],
@@ -834,8 +899,8 @@ export function ehdokkaat(p, edellinen, kaytetyt = new Set()) {
   if (p.laji === 'muu' && p.viivat.length >= 3 && p.koko >= 70 && edellinen !== 'kehys' && Math.random() < 0.6) nimet.unshift('kehys');
   // Tunnistettu tähti tai sydän: matkija ensin.
   if (p.muoto) nimet.unshift('matkija');
-  // Kolmiosta tulee vuori ja suorakulmiosta lahja.
-  if (p.monikulmio?.nimi === 'kolmio') nimet.unshift('vuori');
+  // Kärki ylös -kolmiosta tulee vuori, kärki alas -kolmiosta jäätelö tai pizza, ja suorakulmiosta lahja.
+  if (p.monikulmio?.nimi === 'kolmio') nimet.unshift(...(Math.random() < 0.5 ? ['jaatelo', 'pizza'] : ['pizza', 'jaatelo']), 'vuori');
   if (p.monikulmio?.nimi === 'suorakulmio') nimet.unshift('lahja');
   nimet.push(...(VARAT[p.laji] || []));
   if (!nimet.includes('tahdet') && p.laji !== 'piste') nimet.push('tahdet');
