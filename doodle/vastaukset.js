@@ -820,32 +820,6 @@ Object.assign(VASTAUKSET, {
     );
     return osat;
   },
-  // Pizzapala: reunus yläreunaan, pepperonit ja juustoa valumassa kärjestä.
-  pizza(p) {
-    const k = kolmioAlas(p);
-    if (!k) return null;
-    const { karki: C, vas: A, oik: B } = k;
-    const leveys = Math.hypot(B[0] - A[0], B[1] - A[1]);
-    // Reunus: aaltoileva viiva hieman yläreunan yläpuolella.
-    const reunus = [A];
-    for (let i = 1; i < 12; i++) {
-      const q = lerp(A, B, i / 12);
-      reunus.push([q[0], q[1] - 9 - Math.sin((i / 12) * Math.PI * 6) * 2]);
-    }
-    reunus.push(B);
-    const osat = [{ d: polyline(reunus) }];
-    const r = Math.max(5, Math.min(10, leveys * 0.075));
-    const kohta = (a, b, c) => [A[0] * a + B[0] * b + C[0] * c, A[1] * a + B[1] * b + C[1] * c];
-    for (const [a, b, c, s] of [[0.55, 0.3, 0.15, 1], [0.2, 0.62, 0.18, 0.9], [0.36, 0.24, 0.4, 0.8], [0.18, 0.3, 0.52, 0.65]]) {
-      const q = kohta(a, b, c);
-      osat.push({ d: ympyraPolku(q[0], q[1], r * s) });
-    }
-    // Juustotippa roikkuu kyljestä lähellä kärkeä.
-    const kylki = Math.random() < 0.5 ? A : B;
-    const [t1, t2] = [lerp(kylki, C, 0.62), lerp(kylki, C, 0.74)];
-    osat.push({ d: `M${f(t1[0])} ${f(t1[1])} C${f(t1[0])} ${f(t1[1] + 22)} ${f(t2[0])} ${f(t2[1] + 22)} ${f(t2[0])} ${f(t2[1])}` });
-    return osat;
-  },
 });
 
 // Mitkä vastaukset sopivat millekin piirrokselle, suosituimmuusjärjestyksessä (satunnaistetaan doodle.js:ssä).
@@ -884,8 +858,8 @@ export function ehdokkaat(p, edellinen, kaytetyt = new Set()) {
   if (p.laji === 'muu' && p.viivat.length >= 3 && p.koko >= 70 && edellinen !== 'kehys' && Math.random() < 0.6) nimet.unshift('kehys');
   // Tunnistettu tähti tai sydän: matkija ensin.
   if (p.muoto) nimet.unshift('matkija');
-  // Kärki ylös -kolmiosta tulee vuori, kärki alas -kolmiosta jäätelö tai pizza, ja suorakulmiosta lahja.
-  if (p.monikulmio?.nimi === 'kolmio') nimet.unshift(...(Math.random() < 0.5 ? ['jaatelo', 'pizza'] : ['pizza', 'jaatelo']), 'vuori');
+  // Kärki ylös -kolmiosta tulee vuori, kärki alas -kolmiosta jäätelö, ja suorakulmiosta lahja.
+  if (p.monikulmio?.nimi === 'kolmio') nimet.unshift('jaatelo', 'vuori');
   if (p.monikulmio?.nimi === 'suorakulmio') nimet.unshift('lahja');
   nimet.push(...(VARAT[p.laji] || []));
   if (!nimet.includes('tahdet') && p.laji !== 'piste') nimet.push('tahdet');
