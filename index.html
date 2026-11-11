@@ -44,10 +44,11 @@ main .wrap{width:100%;padding-block:32px 72px}
 .choice:hover .go svg,.choice:focus-visible .go svg{transform:translateX(4px)}
 .choice .url{display:block;margin-top:10px;font-size:14px;color:var(--soft)}
 
-.cv{background:var(--card);padding:14px 14px 26px;box-shadow:0 10px 24px rgba(0,0,0,.14);transform:rotate(2deg);max-width:360px;justify-self:center;width:100%;order:2}
+.cv{background:var(--card);padding:26px 26px 24px;box-shadow:0 10px 24px rgba(0,0,0,.14);transform:rotate(2deg);max-width:360px;justify-self:center;width:100%;order:2}
 .cv::before{content:"";position:absolute;top:-12px;left:36%;width:30%;height:24px;background:var(--tape);transform:rotate(-3deg)}
-.cv .ph{display:grid;grid-template-columns:120px 1fr;gap:18px;align-items:center}
-.cv img{display:block;width:100%;height:auto;max-width:100%;aspect-ratio:4/5;object-fit:cover;object-position:50% 20%}
+.ph{display:grid;grid-template-columns:110px 1fr;gap:18px;align-items:center;margin-top:12px}
+.ph>p{min-width:0}
+.ph img{display:block;width:100%;height:auto;max-width:100%;aspect-ratio:4/5;object-fit:cover;object-position:50% 20%}
 .cv .tag{font-size:26px;line-height:1;color:var(--soft)}
 .cv b{display:block;font-size:40px;line-height:48px;letter-spacing:-.01em}
 .cv p{margin:0;font-size:15.5px;color:var(--soft);line-height:1.45}
@@ -67,7 +68,7 @@ footer a{color:inherit}
       .pick{grid-template-columns:1fr;gap:44px}
   .cv,.dp{justify-self:start;max-width:340px}
 }
-@media (max-width:380px){.cv .ph{grid-template-columns:96px 1fr}.cv b,.dp b{font-size:34px;line-height:40px}}
+@media (max-width:380px){.ph{grid-template-columns:90px 1fr}.cv b,.dp b{font-size:34px;line-height:40px}}
 @media (prefers-reduced-motion:reduce){.choice,.choice .go svg{transition:none}}
 </style>
 </head>
@@ -83,21 +84,19 @@ footer a{color:inherit}
 
     <div class="pick">
       <a class="choice cv" href="/CV/">
-        <div class="ph">
-          <img src="/assets/jussi-portaali.jpg" width="400" height="560" alt="Jussi Virta">
-          <div>
-            <span class="tag hand">Työnantajille</span>
-            <b>CV</b>
-            <p>Työkokemus, osaaminen ja koulutus.</p>
-          </div>
-        </div>
+        <span class="tag hand">Työnantajille</span>
+        <b>CV</b>
+        <p>Työkokemus, osaaminen ja koulutus.</p>
         <span class="go">Avaa CV <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
       </a>
 
       <a class="choice dp" href="/digipalvelut/">
         <span class="tag hand">Yrityksille</span>
         <b>Digipalvelut</b>
-        <p>Kotisivut, sisältöpäivitykset, Google-näkyvyys, mainonta ja tilakuvat.</p>
+        <div class="ph">
+          <img src="/assets/jussi-portaali.jpg" width="400" height="560" alt="Jussi Virta">
+          <p>Kotisivut, sisältöpäivitykset, Google-näkyvyys, mainonta ja tilakuvat.</p>
+        </div>
         <span class="go">Katso palvelut <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
       </a>
     </div>
