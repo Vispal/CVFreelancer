@@ -1,12 +1,14 @@
 // Etusivun "salaperäinen piirtäjä": hetken kuluttua sivun avaamisesta kynä piirtää ruutupaperille pieniä
 // kuvia (tähti, kissa, hymiö...). Vain työpöydällä hiirellä, ei kun käyttäjä on pyytänyt vähemmän liikettä.
 // Kävijä voi piirtää itse hiirellä muualle kuin korttien päälle. Kortit, logo ja alatunniste jätetään piirtäjältä
-// aina rauhaan. Ei evästeitä, ei tallennusta, ei verkkopyyntöjä.
+// aina rauhaan. Kun kävijä piirtää, piirtäjä vastaa hetken päästä piirtämällä jotain sen ympärille (vastaukset.js).
+// Ei evästeitä, ei tallennusta, ei verkkopyyntöjä.
 import { SHAPES } from './shapes.js';
+import { tulkitse, ehdokkaat, sydanValiin, KIITOS } from './vastaukset.js';
 
 const ASETUKSET = {
   alkuviive: 4000, // ms sivun latautumisesta ensimmäiseen kuvaan
-  tauko: [8000, 15000], // ms kuvien välillä
+  tauko: [6000, 10000], // ms kuvien välillä
   enintaan: 8, // kuvaa per käynti
   koko: [56, 110], // px
   kaanto: 10, // ± astetta
@@ -18,6 +20,9 @@ const ASETUKSET = {
   korttireunus: 6, // px: kävijän viiva katkeaa näin lähellä korttia
   enintaanViivoja: 300, // kävijän viivoja sivulla; vanhimmat häivytetään
   ohjaimet: false, // alatunnisteen vihje sekä pyyhi- ja hiljaa-painikkeet; piilotettu toistaiseksi
+  vastausviive: [1500, 3000], // ms kävijän viimeisestä viivasta piirtäjän vastaukseen
+  keskustelutauko: 10000, // ms: piirtäjän omat kuvat odottavat näin kauan kävijän viimeisestä viivasta
+  enintaanVastauksia: 10, // sen jälkeen piirtäjä kirjoittaa "kiitos!" ja lopettaa vastaamisen
 };
 
 const SUOJATUT = '.choice, header .logo, header small, footer .wrap > *';
@@ -91,6 +96,11 @@ const piirretyt = []; // { g, laatikko, tyyppi: 'piirtaja' | 'kavija', viivat? }
 let pussi = [];
 let maara = 0;
 let hiljaa = false; // kävijä pysäytti piirtäjän
+let piirtaa = false; // piirtäjän kynä liikkuu juuri nyt
+let ryhma = []; // kävijän viivat, joihin ei ole vielä vastattu
+let vastausId = 0;
+let vastauksia = 0;
+let edellinenVastaus = '';
 let ohjaimet = null;
 
 function aloita() {
@@ -113,6 +123,10 @@ function aloita() {
 
 function seuraava() {
   if (hiljaa || maara >= ASETUKSET.enintaan) return;
+  if (piirtaa) {
+    ajastin.aseta(seuraava, 2000);
+    return;
+  }
   if (piirraKuva()) {
     maara++;
     naytaOhjaimet();
@@ -143,21 +157,22 @@ function suojatutAlueet() {
 
 const leikkaa = (a, b) => a.x1 < b.x2 && a.x2 > b.x1 && a.y1 < b.y2 && a.y2 > b.y1;
 
-function etsiPaikka(koko) {
+function etsiPaikka(koko, korkeus = koko) {
   const { reunus, ruutu } = ASETUKSET;
+  const leveys = koko;
   const w = window.innerWidth;
   const h = window.innerHeight;
-  if (w - 2 * reunus < koko || h - 2 * reunus < koko) return null;
+  if (w - 2 * reunus < leveys || h - 2 * reunus < korkeus) return null;
   const esteet = suojatutAlueet().concat(
     piirretyt.map(({ laatikko: l }) => ({ x1: l.x1 - 12, y1: l.y1 - 12, x2: l.x2 + 12, y2: l.y2 + 12 }))
   );
   for (let i = 0; i < 30; i++) {
-    let x = satunnainen(reunus, w - reunus - koko);
-    let y = satunnainen(reunus, h - reunus - koko);
+    let x = satunnainen(reunus, w - reunus - leveys);
+    let y = satunnainen(reunus, h - reunus - korkeus);
     // Löyhästi ruudukkoon, jotta kuva istuu vihkoon.
-    x = Math.min(w - reunus - koko, Math.max(reunus, Math.round(x / ruutu) * ruutu + satunnainen(-3, 3)));
-    y = Math.min(h - reunus - koko, Math.max(reunus, Math.round(y / ruutu) * ruutu + satunnainen(-3, 3)));
-    const l = { x1: x, y1: y, x2: x + koko, y2: y + koko };
+    x = Math.min(w - reunus - leveys, Math.max(reunus, Math.round(x / ruutu) * ruutu + satunnainen(-3, 3)));
+    y = Math.min(h - reunus - korkeus, Math.max(reunus, Math.round(y / ruutu) * ruutu + satunnainen(-3, 3)));
+    const l = { x1: x, y1: y, x2: x + leveys, y2: y + korkeus };
     if (!esteet.some((e) => leikkaa(l, e))) return l;
   }
   return null;
@@ -185,7 +200,23 @@ function hayta(i) {
 
 // --- viivojen muuttaminen käsin piirretyiksi ---------------------------------------------------------------
 
+// Kuvan tai sanan koordinaatit (leveys × 100) näytölle: keskikohta (cx, cy), korkeus koko px, kulma radiaaneina.
+function muunnin(cx, cy, koko, kulma, leveys = 100) {
+  const s = koko / 100;
+  const [cos, sin] = [Math.cos(kulma), Math.sin(kulma)];
+  return (x, y) => {
+    const dx = (x - leveys / 2) * s;
+    const dy = (y - 50) * s;
+    return [cx + dx * cos - dy * sin, cy + dx * sin + dy * cos];
+  };
+}
+const suoraan = (x, y) => [x, y];
+
 function kasinPiirretty(d, muunna) {
+  return heiluta(naytteet(d, muunna));
+}
+
+function naytteet(d, muunna) {
   mittari.setAttribute('d', d);
   const pituus = mittari.getTotalLength();
   const n = Math.max(8, Math.ceil(pituus / 3));
@@ -194,6 +225,11 @@ function kasinPiirretty(d, muunna) {
     const p = mittari.getPointAtLength((pituus * i) / n);
     pisteet.push(muunna(p.x, p.y));
   }
+  return pisteet;
+}
+
+function heiluta(pisteet) {
+  const n = pisteet.length - 1;
   const alku = pisteet[0];
   const loppu = pisteet[pisteet.length - 1];
   const suljettu = Math.hypot(alku[0] - loppu[0], alku[1] - loppu[1]) < 1.5 && n > 12;
@@ -249,24 +285,20 @@ function piirraKuva() {
   const koko = Math.round(satunnainen(...ASETUKSET.koko));
   const laatikko = etsiPaikka(koko);
   if (!laatikko) return false;
-
-  const cx = laatikko.x1 + koko / 2;
-  const cy = laatikko.y1 + koko / 2;
   const kulma = (satunnainen(-ASETUKSET.kaanto, ASETUKSET.kaanto) * Math.PI) / 180;
-  const s = koko / 100;
-  const [cos, sin] = [Math.cos(kulma), Math.sin(kulma)];
-  const muunna = (x, y) => {
-    const dx = (x - 50) * s;
-    const dy = (y - 50) * s;
-    return [cx + dx * cos - dy * sin, cy + dx * sin + dy * cos];
-  };
+  const muunna = muunnin(laatikko.x1 + koko / 2, laatikko.y1 + koko / 2, koko, kulma);
+  piirra(kuva.viivat.map((d) => naytteet(d, muunna)), kuva.nimi, laatikko);
+  return true;
+}
 
-  const g = el('g', { class: 'piirros', 'data-kuva': kuva.nimi, 'stroke-width': satunnainen(3.2, 3.8).toFixed(2) });
+// Piirtää valmiiksi näytteistetyt viivat (pistelistat näytön koordinaateissa) piirtäjän kynällä.
+function piirra(pistelistat, nimi, laatikko, lisa = {}) {
+  const g = el('g', { class: 'piirros', 'data-kuva': nimi, 'stroke-width': satunnainen(3.2, 3.8).toFixed(2) });
   kerros.insertBefore(g, kyna);
-  piirretyt.push({ g, laatikko, tyyppi: 'piirtaja' });
+  piirretyt.push({ g, laatikko, tyyppi: 'piirtaja', ...lisa });
 
-  const viivat = kuva.viivat.map((d) => {
-    const pisteet = kasinPiirretty(d, muunna);
+  const viivat = pistelistat.map((raaka) => {
+    const pisteet = heiluta(raaka);
     const k = kertymat(pisteet);
     const pituus = k[k.length - 1];
     const p = el('path', { d: polku(pisteet), 'stroke-dasharray': `${pituus + 2} ${pituus + 2}` });
@@ -276,7 +308,6 @@ function piirraKuva() {
   });
 
   animoi(viivat, g);
-  return true;
 }
 
 function animoi(viivat, g) {
@@ -288,10 +319,15 @@ function animoi(viivat, g) {
   const ensimmainen = viivat[0].pisteet[0];
   asetaKyna(ensimmainen[0], ensimmainen[1]);
   kyna.classList.add('nakyy');
+  piirtaa = true;
+  const valmis = () => {
+    kyna.classList.remove('nakyy');
+    piirtaa = false;
+  };
 
   const askel = (nyt) => {
     if (!g.isConnected || g.classList.contains('pois')) {
-      kyna.classList.remove('nakyy'); // kävijä pyyhki paperin kesken piirron
+      valmis(); // paperi pyyhittiin kesken piirron
       return;
     }
     const dt = Math.min(50, nyt - edellinen); // piilossa ollut välilehti ei hyppää eteenpäin
@@ -318,7 +354,7 @@ function animoi(viivat, g) {
       v.p.style.strokeDashoffset = 0;
       i++;
       if (i >= viivat.length) {
-        kyna.classList.remove('nakyy');
+        valmis();
         return;
       }
       nostoAlku = [x, y];
@@ -375,6 +411,8 @@ function alkaa(e) {
   const alueet = korttiAlueet();
   if (sisalla(e.clientX, e.clientY, alueet)) return;
   e.preventDefault(); // ei tekstin valintaa eikä kuvan raahausta
+  clearTimeout(vastausId); // kävijä piirtää yhä: vastataan vasta kun hän pitää tauon
+  if (ajastin.fn && !hiljaa) ajastin.aseta(seuraava, ASETUKSET.keskustelutauko);
   try {
     document.body.setPointerCapture(e.pointerId);
   } catch {}
@@ -456,9 +494,12 @@ function loppuu() {
     v.g.remove(); // pelkkä napsautus
     return;
   }
-  piirretyt.push({ g: v.g, laatikko: v.laatikko, tyyppi: 'kavija', viivat: v.viivat.map((x) => x.pisteet) });
+  const merkinta = { g: v.g, laatikko: v.laatikko, tyyppi: 'kavija', viivat: v.viivat.map((x) => x.pisteet) };
+  piirretyt.push(merkinta);
   karsi();
   naytaOhjaimet();
+  ryhma.push(merkinta);
+  ajastaVastaus(satunnainen(...ASETUKSET.vastausviive));
 }
 
 // Pitää kävijän viivojen määrän kohtuullisena: vanhimmat häipyvät ensin.
@@ -510,4 +551,90 @@ function nappi(teksti, nimi, fn) {
 
 function naytaOhjaimet() {
   if (ohjaimet) ohjaimet.classList.add('nakyy');
+}
+
+// --- piirtäjä vastaa kävijälle -----------------------------------------------------------------------------
+
+function ajastaVastaus(ms) {
+  clearTimeout(vastausId);
+  vastausId = setTimeout(vastaa, ms);
+}
+
+function vastaa() {
+  if (hiljaa || veto || document.hidden) return ajastaVastaus(1500);
+  if (piirtaa) return ajastaVastaus(600);
+  const merkinnat = ryhma.filter((m) => m.g.isConnected && !m.g.classList.contains('pois'));
+  ryhma = [];
+  if (!merkinnat.length || vastauksia > ASETUKSET.enintaanVastauksia) return;
+
+  if (vastauksia === ASETUKSET.enintaanVastauksia) {
+    vastauksia++;
+    kiitos();
+    return;
+  }
+
+  const viivat = merkinnat.flatMap((m) => m.viivat).filter((v) => v.length > 0);
+  if (!viivat.length) return;
+  const p = tulkitse(viivat);
+
+  // Jos kävijä piirsi piirtäjän oman kuvan viereen, piirtäjä vastaa joskus sydämellä niiden väliin.
+  const omat = piirretyt.filter((m) => m.tyyppi === 'piirtaja' && !m.vastaus);
+  const lahin = omat
+    .map((m) => ({ cx: (m.laatikko.x1 + m.laatikko.x2) / 2, cy: (m.laatikko.y1 + m.laatikko.y2) / 2 }))
+    .map((o) => ({ ...o, etaisyys: Math.hypot(o.cx - p.cx, o.cy - p.cy) }))
+    .sort((a, b) => a.etaisyys - b.etaisyys)[0];
+  const lista = ehdokkaat(p, edellinenVastaus);
+  if (lahin && lahin.etaisyys < 220 && lahin.etaisyys > 60 && edellinenVastaus !== 'sydän' && Math.random() < 0.5) {
+    lista.unshift(sydanValiin(p, lahin));
+  }
+
+  for (const ehdokas of lista) {
+    const valmis = valmistele(ehdokas.osat);
+    if (!valmis || !mahtuu(valmis.laatikko, p.laatikko)) continue;
+    piirra(valmis.pistelistat, ehdokas.nimi, valmis.laatikko, { vastaus: true });
+    edellinenVastaus = ehdokas.nimi;
+    vastauksia++;
+    return;
+  }
+}
+
+// Muuttaa vastauksen osat pistelistoiksi näytön koordinaateissa ja laskee niiden laatikon.
+function valmistele(osat) {
+  const pistelistat = [];
+  for (const osa of osat) {
+    if (osa.kuva) {
+      const muunna = muunnin(osa.cx, osa.cy, osa.koko, osa.kulma || 0, osa.kuva.leveys || 100);
+      for (const d of osa.kuva.viivat) pistelistat.push(naytteet(d, muunna));
+    } else pistelistat.push(naytteet(osa.d, suoraan));
+  }
+  if (!pistelistat.length) return null;
+  const l = { x1: Infinity, y1: Infinity, x2: -Infinity, y2: -Infinity };
+  for (const [x, y] of pistelistat.flat()) {
+    l.x1 = Math.min(l.x1, x - 3);
+    l.y1 = Math.min(l.y1, y - 3);
+    l.x2 = Math.max(l.x2, x + 3);
+    l.y2 = Math.max(l.y2, y + 3);
+  }
+  return { pistelistat, laatikko: l };
+}
+
+// Vastaus saa koskea kävijän piirrokseen (se piirretään sen ympärille), mutta ei kortteihin, logoon,
+// alatunnisteeseen eikä ruudun reunan yli.
+function mahtuu(l, oma) {
+  const r = 8;
+  if (l.x1 < r || l.y1 < r || l.x2 > window.innerWidth - r || l.y2 > window.innerHeight - r) return false;
+  const esteet = [...document.querySelectorAll(SUOJATUT)].map((e) => {
+    const b = e.getBoundingClientRect();
+    return { x1: b.left - r, y1: b.top - r, x2: b.right + r, y2: b.bottom + r };
+  });
+  return !esteet.some((e) => leikkaa(l, e));
+}
+
+function kiitos() {
+  const korkeus = 44;
+  const leveys = (KIITOS.leveys / 100) * korkeus;
+  const paikka = etsiPaikka(leveys, korkeus);
+  if (!paikka) return;
+  const muunna = muunnin(paikka.x1 + leveys / 2, paikka.y1 + korkeus / 2, korkeus, satunnainen(-0.08, 0.08), KIITOS.leveys);
+  piirra(KIITOS.viivat.map((d) => naytteet(d, muunna)), KIITOS.nimi, paikka, { vastaus: true });
 }
