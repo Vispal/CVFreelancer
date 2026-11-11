@@ -18,8 +18,10 @@ Serve the folder with a simple local static server.
 
 ## Deployment
 
-This project is deployed to Cloudflare Pages through its GitHub integration.
-The `main` branch is deployed from the project root without a build step.
+This project is deployed to Cloudflare Pages through its GitHub integration
+(connected in November 2026; before that the site was uploaded by hand).
+Every push to `main` is deployed from the project root without a build step:
+no framework preset, no build command, build output directory `/`.
 
 ## Notes
 
