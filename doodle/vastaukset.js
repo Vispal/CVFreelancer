@@ -47,6 +47,7 @@ export function tulkitse(viivat) {
   if (koko < 14) laji = 'piste';
   else if (suljettu) laji = 'silmukka';
   else if (yksi && onMaki(eka, { x1, y1, w, h }, kaannoksia)) laji = 'maki';
+  else if (yksi && onLaakso(eka, { x1, y2, w, h }, kaannoksia)) laji = 'laakso';
   else if (yksi && koko >= 60 && w > 1.8 * h && kaannoksia >= 2 && janne / muste > 0.45) laji = 'aalto';
   else if (yksi && koko >= 60 && janne / muste > 0.85) {
     // Suoran viivan kaltevuus vasemmalta oikealle: + = alamäki, − = ylämäki (ruudun y kasvaa alaspäin).
@@ -95,6 +96,17 @@ function onMaki(v, { x1, y1, w, h }, kaannoksia) {
   if (Math.abs(a[0] - b[0]) < 0.8 * w) return false;
   const huippu = v.reduce((m, q) => (q[1] < m[1] ? q : m));
   const t = (huippu[0] - x1) / w;
+  return t > 0.15 && t < 0.85;
+}
+
+// Laakso: mäen peilikuva (∪). Päät ovat ylhäällä, ja matalin kohta on niiden välissä.
+function onLaakso(v, { x1, y2, w, h }, kaannoksia) {
+  if (w < 40 || kaannoksia !== 1 || h < 0.2 * w || h > 1.3 * w) return false;
+  const [a, b] = [v[0], v[v.length - 1]];
+  if (a[1] > y2 - 0.6 * h || b[1] > y2 - 0.6 * h || Math.abs(a[1] - b[1]) > 0.4 * h) return false;
+  if (Math.abs(a[0] - b[0]) < 0.8 * w) return false;
+  const pohja = v.reduce((m, q) => (q[1] > m[1] ? q : m));
+  const t = (pohja[0] - x1) / w;
   return t > 0.15 && t < 0.85;
 }
 
@@ -694,6 +706,98 @@ Object.assign(VASTAUKSET, {
   },
 });
 
+// Laakson päät (vasen ja oikea) ja pinnan korkeus kohdassa x.
+function laakso(p) {
+  const v = p.viivat[0];
+  const [vas, oik] = p.alku[0] <= p.loppu[0] ? [p.alku, p.loppu] : [p.loppu, p.alku];
+  return { v, vas, oik, pinta: (x) => viivanY(v, x) };
+}
+// Kohta, jossa laakson reuna on korkeudella y (vasemmalta tai oikealta etsien).
+function reunaKorkeudella(v, y, puoli) {
+  const jarj = v.slice().sort((a, b) => (a[0] - b[0]) * puoli);
+  return jarj.find((q) => q[1] >= y) || jarj[0];
+}
+
+Object.assign(VASTAUKSET, {
+  // Hymy: kaksi silmää kaaren yläpuolelle.
+  hymy(p) {
+    if (p.w > 280) return null;
+    const { vas, oik } = laakso(p);
+    const yla = Math.min(vas[1], oik[1]);
+    const pit = Math.max(8, Math.min(22, p.h * 0.35));
+    const y = yla - Math.max(14, p.h * 0.45);
+    return [-1, 1].map((s) => {
+      const x = p.cx + s * p.w * 0.22;
+      return { d: `M${f(x)} ${f(y - pit)} L${f(x)} ${f(y)}` };
+    });
+  },
+  // Riippumatto: tolpat päihin, nukkuja keinumaan ja zzz.
+  riippumatto(p) {
+    if (p.w < 80) return null;
+    const { vas, oik, pinta } = laakso(p);
+    const maa = p.laatikko.y2 + 30;
+    const osat = [vas, oik].map((q) => ({ d: `M${f(q[0])} ${f(q[1] - 14)} L${f(q[0])} ${f(maa)}` }));
+    // Nukkuja: pää ja peiton kumpu riippumaton päällä.
+    const px = p.laatikko.x1 + p.w * 0.28;
+    osat.push({ d: ympyraPolku(px, pinta(px) - 11, 9) });
+    let peitto = '';
+    for (let i = 0; i <= 12; i++) {
+      const x = px + 12 + (p.w * 0.36 * i) / 12;
+      peitto += `${i ? 'L' : 'M'}${f(x)} ${f(pinta(x) - 5 - Math.sin((i / 12) * Math.PI) * 18)} `;
+    }
+    osat.push({ d: peitto.trim() });
+    let [zx, zy] = [p.cx + p.w * 0.1, p.laatikko.y1 - 6];
+    for (const k of [9, 12, 16]) {
+      osat.push({ d: `M${f(zx)} ${f(zy - k)} L${f(zx + k)} ${f(zy - k)} L${f(zx)} ${f(zy)} L${f(zx + k)} ${f(zy)}` });
+      zx += k + 5;
+      zy -= k + 3;
+    }
+    return osat;
+  },
+  // Lampi: vedenpinta, väreitä ja ankka uimassa.
+  lampi(p) {
+    if (p.w < 90) return null;
+    const { v } = laakso(p);
+    const vy = p.laatikko.y1 + p.h * 0.35;
+    const a = reunaKorkeudella(v, vy, 1), b = reunaKorkeudella(v, vy, -1);
+    const lev = b[0] - a[0];
+    if (lev < 70) return null;
+    const osat = [{ d: `M${f(a[0])} ${f(vy)} L${f(b[0])} ${f(vy)}` }];
+    // Väreet vain sinne, missä ne mahtuvat kokonaan laakson sisään.
+    for (const [t, dy, l] of [[0.25, 14, 0.18], [0.6, 24, 0.14]]) {
+      const y = vy + dy, x = a[0] + lev * t;
+      const [va, oi] = [reunaKorkeudella(v, y, 1)[0] + 6, reunaKorkeudella(v, y, -1)[0] - 6];
+      if (y < p.laatikko.y2 - 6 && x > va && x + lev * l < oi) osat.push({ d: `M${f(x)} ${f(y)} L${f(x + lev * l)} ${f(y)}` });
+    }
+    // Ankka: vartalo vedenpinnan päällä, pää, nokka ja silmä.
+    const ax = a[0] + lev * (Math.random() < 0.5 ? 0.4 : 0.6), suunta = Math.random() < 0.5 ? -1 : 1;
+    const m = 1.6; // ankan koko
+    const takaosa = ax - suunta * 15 * m, etuosa = ax + suunta * 13 * m;
+    osat.push(
+      { d: `M${f(takaosa)} ${f(vy - 1)} Q${f(takaosa - suunta * 4 * m)} ${f(vy - 14 * m)} ${f(ax)} ${f(vy - 11 * m)} L${f(etuosa)} ${f(vy - 11 * m)} Q${f(etuosa + suunta * 6 * m)} ${f(vy - 1)} ${f(etuosa - suunta * 2 * m)} ${f(vy - 1)} Z` },
+      { d: ympyraPolku(etuosa - suunta * 2 * m, vy - 19 * m, 6 * m) },
+      { d: `M${f(etuosa + suunta * 3 * m)} ${f(vy - 20 * m)} L${f(etuosa + suunta * 10 * m)} ${f(vy - 18 * m)} L${f(etuosa + suunta * 3 * m)} ${f(vy - 16 * m)}` },
+      { d: `M${f(etuosa - suunta * 1 * m)} ${f(vy - 21 * m)} L${f(etuosa - suunta * 1 * m)} ${f(vy - 20 * m)}` },
+    );
+    return osat;
+  },
+  // Veneen runko: kansi, masto ja purje.
+  purjevene(p) {
+    if (p.w < 60 || p.h > p.w * 0.8) return null;
+    const { vas, oik } = laakso(p);
+    const kansi = (vas[1] + oik[1]) / 2;
+    const masto = Math.max(40, Math.min(120, p.w * 0.75));
+    const mx = p.cx + p.w * 0.05;
+    const osat = [
+      { d: `M${f(vas[0])} ${f(vas[1])} L${f(oik[0])} ${f(oik[1])}` },
+      { d: `M${f(mx)} ${f(kansi)} L${f(mx)} ${f(kansi - masto)}` },
+      { d: `M${f(mx)} ${f(kansi - masto + 4)} L${f(mx - p.w * 0.38)} ${f(kansi - 8)} L${f(mx)} ${f(kansi - 8)}` },
+      { d: `M${f(mx)} ${f(kansi - masto)} L${f(mx + 16)} ${f(kansi - masto + 5)} L${f(mx)} ${f(kansi - masto + 10)}` },
+    ];
+    return osat;
+  },
+});
+
 // Mitkä vastaukset sopivat millekin piirrokselle, suosituimmuusjärjestyksessä (satunnaistetaan doodle.js:ssä).
 const SOPIVAT = {
   silmukka: ['kasvot', 'kissa', 'aurinko', 'ilmapallo'],
@@ -709,6 +813,7 @@ const SOPIVAT = {
   risti: ['aarre'],
   osoitin: ['maalitaulu'],
   maki: ['mokki', 'puulammas', 'tunneli', 'myyra'],
+  laakso: ['hymy', 'riippumatto', 'lampi', 'purjevene'],
 };
 // Jos mikään sopiva ei mahdu, kokeillaan näitä.
 const VARAT = {
