@@ -7,10 +7,11 @@ A minimal static CV / personal website built with plain HTML and CSS.
 - `index.html` – front page (jussivirta.fi/) with two choices: Digipalvelut and CV
 - `CV/` – CV page (jussivirta.fi/CV/): `index.html` and `styles.css`
 - `digipalvelut/` – digital services page for small businesses (jussivirta.fi/digipalvelut/), with its privacy page and PDFs. Its `index.html` is generated in a separate project; edit the content there and copy the built file here.
-- `freelance/` – earlier freelance page (jussivirta.fi/freelance/)
 - `fontit/` – Atkinson Hyperlegible and Caveat (OFL) used by the front page
 - `assets/` – images and downloadable PDFs
-- `_redirects` – Cloudflare Pages redirect from /cv to /CV/
+- `_redirects` – Cloudflare Pages redirects: /cv to /CV/ and the retired /freelance/ page to /digipalvelut/
+- `_headers` – security headers (CSP, HSTS, frame and referrer policy)
+- `robots.txt`, `sitemap.xml` – search engine files; update `sitemap.xml` when pages are added
 
 ## Local preview
 
