@@ -298,8 +298,11 @@ const SOPIVAT = {
 // Jos mikään sopiva ei mahdu, kokeillaan näitä.
 const VARAT = { maa: ['etana', 'nuoli'], aalto: ['tahdet'] };
 
+// Nämä vastaukset piirretään korkeintaan kerran sivun latauksen aikana.
+const KERRAN = ['vau'];
+
 // Palauttaa ehdokkaat [{ nimi, osat }] siinä järjestyksessä kuin niitä kannattaa kokeilla.
-export function ehdokkaat(p, edellinen) {
+export function ehdokkaat(p, edellinen, kaytetyt = new Set()) {
   const nimet = SOPIVAT[p.laji].slice().sort(() => Math.random() - 0.5);
   // Ei samaa vastausta kahdesti peräkkäin, jos muutakin on tarjolla.
   nimet.sort((a, b) => (a === edellinen) - (b === edellinen));
@@ -309,7 +312,9 @@ export function ehdokkaat(p, edellinen) {
   if (p.muoto) nimet.unshift('matkija');
   nimet.push(...(VARAT[p.laji] || []));
   if (!nimet.includes('tahdet') && p.laji !== 'piste') nimet.push('tahdet');
-  return [...new Set(nimet)].map((nimi) => ({ nimi, osat: VASTAUKSET[nimi](p) })).filter((e) => e.osat && e.osat.length);
+  return [...new Set(nimet)]
+    .filter((nimi) => !(KERRAN.includes(nimi) && kaytetyt.has(nimi)))
+    .map((nimi) => ({ nimi, osat: VASTAUKSET[nimi](p) })).filter((e) => e.osat && e.osat.length);
 }
 
 // Sydän piirtäjän oman kuvan ja kävijän piirroksen väliin.

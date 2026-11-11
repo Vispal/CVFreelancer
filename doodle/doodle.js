@@ -101,6 +101,7 @@ let ryhma = []; // kävijän viivat, joihin ei ole vielä vastattu
 let vastausId = 0;
 let vastauksia = 0;
 let edellinenVastaus = '';
+const kaytetytVastaukset = new Set();
 let ohjaimet = null;
 
 function aloita() {
@@ -584,7 +585,7 @@ function vastaa() {
     .map((m) => ({ cx: (m.laatikko.x1 + m.laatikko.x2) / 2, cy: (m.laatikko.y1 + m.laatikko.y2) / 2 }))
     .map((o) => ({ ...o, etaisyys: Math.hypot(o.cx - p.cx, o.cy - p.cy) }))
     .sort((a, b) => a.etaisyys - b.etaisyys)[0];
-  const lista = ehdokkaat(p, edellinenVastaus);
+  const lista = ehdokkaat(p, edellinenVastaus, kaytetytVastaukset);
   if (lahin && lahin.etaisyys < 220 && lahin.etaisyys > 60 && edellinenVastaus !== 'sydän' && Math.random() < 0.5) {
     lista.unshift(sydanValiin(p, lahin));
   }
@@ -594,6 +595,7 @@ function vastaa() {
     if (!valmis || !mahtuu(valmis.laatikko, p.laatikko)) continue;
     piirra(valmis.pistelistat, ehdokas.nimi, valmis.laatikko, { vastaus: true });
     edellinenVastaus = ehdokas.nimi;
+    kaytetytVastaukset.add(ehdokas.nimi);
     vastauksia++;
     return;
   }
