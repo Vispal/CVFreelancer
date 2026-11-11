@@ -1,3 +1,9 @@
+/* Archivo (OFL) omalta palvelimelta, ei ulkoisia fonttipalveluita. */
+@font-face{font-family:Archivo;font-weight:400;font-style:normal;font-display:swap;src:url(/fontit/archivo-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:Archivo;font-weight:500;font-style:normal;font-display:swap;src:url(/fontit/archivo-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:Archivo;font-weight:600;font-style:normal;font-display:swap;src:url(/fontit/archivo-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:Archivo;font-weight:700;font-style:normal;font-display:swap;src:url(/fontit/archivo-latin-700-normal.woff2) format("woff2")}
+
 :root {
   --bg: #fbfbfa;
   --panel: #ffffff;
