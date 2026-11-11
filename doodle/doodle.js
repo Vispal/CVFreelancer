@@ -8,7 +8,7 @@ import { tulkitse, ehdokkaat, sydanValiin, KIITOS } from './vastaukset.js';
 
 const ASETUKSET = {
   alkuviive: 4000, // ms sivun latautumisesta ensimmäiseen kuvaan
-  tauko: [4000, 8000], // ms kuvien välillä
+  tauko: [6000, 10000], // ms kuvien välillä
   enintaan: 8, // kuvaa per käynti
   koko: [56, 110], // px
   kaanto: 10, // ± astetta
