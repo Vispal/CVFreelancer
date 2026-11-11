@@ -10,7 +10,8 @@ A minimal static CV / personal website built with plain HTML and CSS.
 - `fontit/` – Atkinson Hyperlegible and Caveat (OFL) used by the front page, and Archivo (OFL) used by the CV page. No external font services are used.
 - `assets/` – images and downloadable PDFs
 - `_redirects` – Cloudflare Pages redirects: /cv to /CV/ and the retired /freelance/ page to /digipalvelut/
-- `_headers` – security headers (CSP, HSTS, frame and referrer policy). The CSP allows scripts only from `https://jussivirta.fi/cdn-cgi/scripts/`, so that Cloudflare Email Address Obfuscation can decode the email addresses; the site has no JavaScript of its own
+- `doodle/` – the front page's "mysterious drawer": after a few seconds a red pencil sketches small doodles on the grid paper (desktop with a mouse only, off with reduced motion). `shapes.js` holds the doodles, `doodle.js` draws them. No cookies, storage or network requests
+- `_headers` – security headers (CSP, HSTS, frame and referrer policy). The CSP allows scripts from `https://jussivirta.fi/cdn-cgi/scripts/`, so that Cloudflare Email Address Obfuscation can decode the email addresses. Only the front page (`/`) also allows the site's own scripts (`'self'`) for `doodle/`; the other pages have no JavaScript of their own
 - `robots.txt`, `sitemap.xml` – search engine files; update `sitemap.xml` when pages are added
 
 ## Local preview
