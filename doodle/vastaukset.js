@@ -46,6 +46,7 @@ export function tulkitse(viivat) {
   let laji = 'muu';
   if (koko < 14) laji = 'piste';
   else if (suljettu) laji = 'silmukka';
+  else if (yksi && onMaki(eka, { x1, y1, w, h }, kaannoksia)) laji = 'maki';
   else if (yksi && koko >= 60 && w > 1.8 * h && kaannoksia >= 2 && janne / muste > 0.45) laji = 'aalto';
   else if (yksi && koko >= 60 && janne / muste > 0.85) {
     // Suoran viivan kaltevuus vasemmalta oikealle: + = alamäki, − = ylämäki (ruudun y kasvaa alaspäin).
@@ -84,6 +85,18 @@ const suora = (v, raja = 0.9) => {
   const L = pituus(v);
   return L > 0 && etaisyysPisteet(v[0], v[v.length - 1]) / L > raja;
 };
+
+// Mäki: yksi kaari, joka nousee ja laskee kerran (∩). Päät ovat suunnilleen samalla korkeudella alhaalla,
+// ja korkein kohta on niiden välissä.
+function onMaki(v, { x1, y1, w, h }, kaannoksia) {
+  if (w < 50 || kaannoksia !== 1 || h < 0.2 * w || h > 1.3 * w) return false;
+  const [a, b] = [v[0], v[v.length - 1]];
+  if (a[1] < y1 + 0.6 * h || b[1] < y1 + 0.6 * h || Math.abs(a[1] - b[1]) > 0.4 * h) return false;
+  if (Math.abs(a[0] - b[0]) < 0.8 * w) return false;
+  const huippu = v.reduce((m, q) => (q[1] < m[1] ? q : m));
+  const t = (huippu[0] - x1) / w;
+  return t > 0.15 && t < 0.85;
+}
 
 // Kaksi suoraa, toisensa leikkaavaa ja eri suuntiin menevää vetoa: X.
 function onRisti(viivat) {
@@ -572,6 +585,115 @@ Object.assign(VASTAUKSET, {
   },
 });
 
+// Mäen huippu, juuren korkeus ja mäen pinnan korkeus kohdassa x.
+function maki(p) {
+  const v = p.viivat[0];
+  const huippu = v.reduce((m, q) => (q[1] < m[1] ? q : m));
+  const pohja = Math.max(p.alku[1], p.loppu[1]);
+  return { v, huippu, pohja, pinta: (x) => viivanY(v, x) };
+}
+
+// Lammas: kiharainen villa, pää alhaalla syömässä ja neljä jalkaa maassa.
+function lammas(x, pinta, suunta) {
+  const m = 1.6; // lampaan koko
+  const maa = pinta(x);
+  const c = [x, maa - 20 * m];
+  let villa = '';
+  for (let i = 0; i <= 48; i++) {
+    const a = (i / 48) * Math.PI * 2;
+    const r = 1 + 0.1 * Math.abs(Math.sin(a * 4));
+    villa += `${i ? 'L' : 'M'}${f(c[0] + Math.cos(a) * 15 * m * r)} ${f(c[1] + Math.sin(a) * 10 * m * r)} `;
+  }
+  const paa = [c[0] + suunta * 17 * m, c[1] + 6 * m];
+  const osat = [
+    { d: villa.trim() },
+    { d: `M${f(paa[0] + 6 * m)} ${f(paa[1])} A${f(6 * m)} ${f(4.5 * m)} 0 1 1 ${f(paa[0] + 6 * m)} ${f(paa[1] - 0.2)}` },
+    { d: `M${f(paa[0] - suunta * 2 * m)} ${f(paa[1] - 4 * m)} L${f(paa[0] - suunta * 7 * m)} ${f(paa[1] - 9 * m)}` },
+  ];
+  for (const dx of [-9, -4, 4, 9]) {
+    const jx = c[0] + dx * m;
+    osat.push({ d: `M${f(jx)} ${f(c[1] + 8 * m)} L${f(jx)} ${f(pinta(jx))}` });
+  }
+  return osat;
+}
+
+Object.assign(VASTAUKSET, {
+  // Mökki mäen päälle, savua piipusta.
+  mokki(p) {
+    if (p.w < 70) return null;
+    const { huippu } = maki(p);
+    const koko = Math.max(36, Math.min(60, p.w * 0.3));
+    const s = koko / 100;
+    const cx = huippu[0], cy = huippu[1] - 0.44 * koko + 2; // talon pohja on kuvassa y = 94
+    const [sx, sy] = [cx + 20 * s, cy - 34 * s]; // piipun yläpää
+    const savu = `M${f(sx)} ${f(sy - 3)} Q${f(sx - 7)} ${f(sy - 11)} ${f(sx)} ${f(sy - 18)} Q${f(sx + 7)} ${f(sy - 25)} ${f(sx + 1)} ${f(sy - 32)} Q${f(sx - 5)} ${f(sy - 38)} ${f(sx + 3)} ${f(sy - 44)}`;
+    return [{ kuva: kuva('talo'), cx, cy, koko, kulma: 0 }, { d: savu }];
+  },
+  // Puu mäen päälle ja lammas rinteelle.
+  puulammas(p) {
+    if (p.w < 90) return null;
+    const { huippu, pinta } = maki(p);
+    const koko = Math.max(60, Math.min(90, p.w * 0.4));
+    const puoli = Math.random() < 0.5 ? -1 : 1;
+    const lx = huippu[0] + puoli * Math.max(40, (puoli > 0 ? p.laatikko.x2 - huippu[0] : huippu[0] - p.laatikko.x1) * 0.6);
+    return [
+      { kuva: PUU, cx: huippu[0], cy: huippu[1] - 0.46 * koko + 2, koko, kulma: 0 },
+      ...lammas(lx, pinta, puoli),
+    ];
+  },
+  // Tunnelin suu mäen juurelle ja pieni juna tulossa ulos.
+  tunneli(p) {
+    if (p.w < 80) return null;
+    const { pohja, pinta } = maki(p);
+    const puoli = Math.random() < 0.5 ? -1 : 1; // kummalle puolelle juna tulee
+    const r = Math.max(9, Math.min(15, p.h * 0.22));
+    const reuna = puoli < 0 ? p.laatikko.x1 : p.laatikko.x2;
+    // Tunnelin paikka: ensimmäinen kohta reunasta sisäänpäin, jossa koko tunnelin suu mahtuu mäen sisään.
+    let tx = reuna - puoli * (r + 4);
+    const mahtuu = (x) => pohja - pinta(x - r) >= 1.6 * r + 14 && pohja - pinta(x + r) >= 1.6 * r + 14;
+    while (Math.abs(tx - reuna) < p.w / 2 && !mahtuu(tx)) tx -= puoli * 3;
+    if (!mahtuu(tx)) return null;
+    const osat = [{ d: `M${f(tx - r)} ${f(pohja)} L${f(tx - r)} ${f(pohja - r * 0.6)} A${f(r)} ${f(r)} 0 0 1 ${f(tx + r)} ${f(pohja - r * 0.6)} L${f(tx + r)} ${f(pohja)}` }];
+    // Kiskot tunnelista ulos ja veturi niiden päällä.
+    const ulos = tx + puoli * r;
+    osat.push({ d: `M${f(ulos)} ${f(pohja)} L${f(reuna + puoli * 100)} ${f(pohja)}` });
+    const m = 1.3; // veturin koko
+    // Veturi on juuri ulkona mäen juurelta, ettei se peitä rinnettä, ja kulkee poispäin tunnelista.
+    const taka = (puoli < 0 ? Math.min(ulos, p.laatikko.x1) : Math.max(ulos, p.laatikko.x2)) + puoli * 6;
+    const etu = taka + puoli * 56 * m;
+    const y = pohja - 6 * m;
+    osat.push(
+      { d: `M${f(taka)} ${f(y)} L${f(taka)} ${f(y - 26 * m)} L${f(taka + puoli * 16 * m)} ${f(y - 26 * m)} L${f(taka + puoli * 16 * m)} ${f(y - 15 * m)} L${f(etu)} ${f(y - 15 * m)} L${f(etu)} ${f(y)} Z` },
+      { d: `M${f(etu - puoli * 12 * m)} ${f(y - 15 * m)} L${f(etu - puoli * 12 * m)} ${f(y - 24 * m)} L${f(etu - puoli * 6 * m)} ${f(y - 24 * m)} L${f(etu - puoli * 6 * m)} ${f(y - 15 * m)}` },
+      { d: `M${f(taka + puoli * 4 * m)} ${f(y - 22 * m)} L${f(taka + puoli * 12 * m)} ${f(y - 22 * m)} L${f(taka + puoli * 12 * m)} ${f(y - 17 * m)} L${f(taka + puoli * 4 * m)} ${f(y - 17 * m)} Z` },
+    );
+    for (const t of [0.18, 0.5, 0.82]) {
+      const wx = taka + (etu - taka) * t;
+      osat.push({ d: ympyraPolku(wx, y + 1, 5 * m) });
+    }
+    return osat;
+  },
+  // Pieni mäki on myyränkeko: myyrä kurkistaa huipulta.
+  myyra(p) {
+    if (p.w > 160) return null;
+    const { huippu, pinta } = maki(p);
+    const r = Math.max(10, Math.min(17, p.w * 0.14));
+    const [x, y] = [huippu[0], huippu[1] + 2];
+    const osat = [
+      { d: `M${f(x - r)} ${f(pinta(x - r))} Q${f(x - r * 1.05)} ${f(y - r * 1.7)} ${f(x)} ${f(y - r * 1.75)} Q${f(x + r * 1.05)} ${f(y - r * 1.7)} ${f(x + r)} ${f(pinta(x + r))}` },
+      { d: `M${f(x - r * 0.4)} ${f(y - r * 1.15)} L${f(x - r * 0.4)} ${f(y - r * 1.0)}` },
+      { d: `M${f(x + r * 0.4)} ${f(y - r * 1.15)} L${f(x + r * 0.4)} ${f(y - r * 1.0)}` },
+      { d: ympyraPolku(x, y - r * 0.7, r * 0.2) },
+    ];
+    // Kaksi tassua, kummassakin kolme kynttä, mäen pinnalla pään vieressä.
+    for (const s of [-1, 1]) {
+      const px = x + s * r * 1.55, py = pinta(px);
+      for (const k of [-1, 0, 1]) osat.push({ d: `M${f(px - s * 2)} ${f(py - 1)} L${f(px + s * 3 + k * 3)} ${f(py - 7)}` });
+    }
+    return osat;
+  },
+});
+
 // Mitkä vastaukset sopivat millekin piirrokselle, suosituimmuusjärjestyksessä (satunnaistetaan doodle.js:ssä).
 const SOPIVAT = {
   silmukka: ['kasvot', 'kissa', 'aurinko', 'ilmapallo'],
@@ -586,6 +708,7 @@ const SOPIVAT = {
   pysty: ['kukkavarsi'],
   risti: ['aarre'],
   osoitin: ['maalitaulu'],
+  maki: ['mokki', 'puulammas', 'tunneli', 'myyra'],
 };
 // Jos mikään sopiva ei mahdu, kokeillaan näitä.
 const VARAT = {
