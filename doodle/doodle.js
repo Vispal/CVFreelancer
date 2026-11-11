@@ -21,7 +21,7 @@ const ASETUKSET = {
   enintaanViivoja: 300, // kävijän viivoja sivulla; vanhimmat häivytetään
   ohjaimet: false, // alatunnisteen vihje sekä pyyhi- ja hiljaa-painikkeet; piilotettu toistaiseksi
   vastausviive: [1500, 3000], // ms kävijän viimeisestä viivasta piirtäjän vastaukseen
-  keskustelutauko: 15000, // ms: piirtäjän omat kuvat odottavat näin kauan kävijän viimeisestä viivasta
+  keskustelutauko: 10000, // ms: piirtäjän omat kuvat odottavat näin kauan kävijän viimeisestä viivasta
   enintaanVastauksia: 10, // sen jälkeen piirtäjä kirjoittaa "kiitos!" ja lopettaa vastaamisen
 };
 
