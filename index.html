@@ -55,7 +55,7 @@ main .wrap{width:100%;padding-block:32px 72px}
 .cv p{margin:0;font-size:15.5px;color:var(--soft);line-height:1.45}
 .cv:hover{transform:rotate(1deg) translateY(-3px);box-shadow:0 14px 30px rgba(0,0,0,.16)}
 
-.dp{background:var(--note);padding:26px 26px 24px;box-shadow:0 10px 24px rgba(0,0,0,.14);transform:rotate(-2deg);max-width:360px;justify-self:center;width:100%;order:1}
+.dp{background:var(--note);padding:26px 26px 24px;box-shadow:0 10px 24px rgba(0,0,0,.14);transform:rotate(-2deg);max-width:370px;justify-self:center;width:100%;order:1}
 .dp .tag{font-size:26px;line-height:1;color:var(--soft)}
 .dp b{display:block;font-size:40px;line-height:48px;letter-spacing:-.01em}
 .dp p{margin:0;font-size:15.5px;color:var(--soft);line-height:1.45}
@@ -68,6 +68,7 @@ footer a{color:inherit}
 @media (max-width:760px){
       .pick{grid-template-columns:1fr;gap:44px}
   .cv,.dp{justify-self:start;max-width:340px}
+  .dp{max-width:370px}
 }
 @media (max-width:380px){.ph{grid-template-columns:90px 1fr}.cv b,.dp b{font-size:34px;line-height:40px}}
 @media (prefers-reduced-motion:reduce){.choice,.choice .go svg{transition:none}}
