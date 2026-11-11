@@ -3,7 +3,7 @@
 // Kävijä voi piirtää itse hiirellä muualle kuin korttien päälle. Kortit, logo ja alatunniste jätetään piirtäjältä
 // aina rauhaan. Kun kävijä piirtää, piirtäjä vastaa hetken päästä piirtämällä jotain sen ympärille (vastaukset.js).
 // Ei evästeitä, ei tallennusta, ei verkkopyyntöjä.
-import { SHAPES } from './shapes.js';
+import { SHAPES, VASTAUSKUVAT } from './shapes.js';
 import { tulkitse, tunnista, ehdokkaat, sydanValiin, KIITOS } from './vastaukset.js';
 
 const ASETUKSET = {
@@ -603,7 +603,7 @@ function vastaa() {
 let malliVarasto = null;
 function mallit() {
   if (!malliVarasto) {
-    const d = (nimi) => SHAPES.find((s) => s.nimi === nimi).viivat[0];
+    const d = (nimi) => [...SHAPES, ...VASTAUSKUVAT].find((s) => s.nimi === nimi).viivat[0];
     malliVarasto = {
       tähti: naytteet(d('tähti'), suoraan),
       sydän: naytteet(d('sydän'), suoraan),

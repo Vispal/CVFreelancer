@@ -44,7 +44,6 @@ const pikkutahti = (cx, cy, r) => {
 
 export const SHAPES = [
   { nimi: 'tähti', viivat: ['M50 6 L61 38 L95 38 L67 58 L78 92 L50 71 L22 92 L33 58 L5 38 L39 38 Z'] },
-  { nimi: 'sydän', viivat: ['M50 88 C20 66 4 48 8 30 C12 12 38 8 50 30 C62 8 88 12 92 30 C96 48 80 66 50 88 Z'] },
   { nimi: 'hymiö', viivat: [ympyra(50, 50, 44), 'M36 34 L36 44', 'M64 34 L64 44', 'M27 60 Q50 84 73 60'] },
   { nimi: 'aurinko', viivat: [ympyra(50, 50, 20), ...[0, 45, 90, 135, 180, 225, 270, 315].map((k) => säde(50, 50, k, 28, 44))] },
   {
@@ -138,6 +137,11 @@ export const SHAPES = [
       'M4 84 Q50 80 96 86', 'M80 85 Q86 76 93 80 Q88 88 80 85',
     ],
   },
+];
+
+// Kuvat, joita piirtäjä käyttää vain vastauksissa (ei omina piirroksinaan).
+export const VASTAUSKUVAT = [
+  { nimi: 'sydän', viivat: ['M50 88 C20 66 4 48 8 30 C12 12 38 8 50 30 C62 8 88 12 92 30 C96 48 80 66 50 88 Z'] },
 ];
 
 // Piirtäjän käsin kirjoittamat sanat vastauksiin. Leveys kertoo ruudun leveyden (korkeus aina 100).

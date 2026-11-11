@@ -4,9 +4,9 @@
 // Vastaus on lista osia, jotka ovat joko
 //   { d }                               SVG-polku suoraan näytön koordinaateissa, tai
 //   { kuva, cx, cy, koko, kulma }       kuva tai sana kirjastosta (shapes.js), keskitettynä pisteeseen.
-import { SHAPES, SANAT } from './shapes.js';
+import { SHAPES, VASTAUSKUVAT, SANAT } from './shapes.js';
 
-const kuva = (nimi) => SHAPES.find((s) => s.nimi === nimi);
+const kuva = (nimi) => SHAPES.find((s) => s.nimi === nimi) || VASTAUSKUVAT.find((s) => s.nimi === nimi);
 const satunnainen = (a, b) => a + Math.random() * (b - a);
 const f = (n) => n.toFixed(1);
 
