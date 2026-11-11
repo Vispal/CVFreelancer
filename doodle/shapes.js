@@ -32,6 +32,16 @@ const säde = (cx, cy, kulma, r1, r2) => {
   return `M${(cx + Math.cos(a) * r1).toFixed(1)} ${(cy + Math.sin(a) * r1).toFixed(1)} L${(cx + Math.cos(a) * r2).toFixed(1)} ${(cy + Math.sin(a) * r2).toFixed(1)}`;
 };
 
+const pikkutahti = (cx, cy, r) => {
+  let d = '';
+  for (let i = 0; i <= 10; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5;
+    const rr = i % 2 ? r * 0.45 : r;
+    d += `${i ? 'L' : 'M'}${(cx + Math.cos(a) * rr).toFixed(1)} ${(cy + Math.sin(a) * rr).toFixed(1)} `;
+  }
+  return d.trim();
+};
+
 export const SHAPES = [
   { nimi: 'tähti', viivat: ['M50 6 L61 38 L95 38 L67 58 L78 92 L50 71 L22 92 L33 58 L5 38 L39 38 Z'] },
   { nimi: 'sydän', viivat: ['M50 88 C20 66 4 48 8 30 C12 12 38 8 50 30 C62 8 88 12 92 30 C96 48 80 66 50 88 Z'] },
@@ -87,6 +97,45 @@ export const SHAPES = [
       'M62 50 Q74 50 74 68 Q74 86 62 86 Q50 86 50 68 Q50 50 62 50',
       'M84 52 L84 86', 'M83.6 36 L84.4 38.5',
       'M96 14 L96 66', 'M95.6 81 L96.4 83.5',
+    ],
+  },
+  {
+    nimi: 'kahvikuppi',
+    viivat: [
+      'M22 44 L26 88 Q27 94 34 94 L62 94 Q69 94 70 88 L74 44 Z',
+      'M73 54 Q90 54 89 66 Q88 78 71 78',
+      'M36 36 Q30 28 36 20 Q42 12 36 4', 'M50 36 Q44 28 50 20 Q56 12 50 4', 'M64 36 Q58 28 64 20 Q70 12 64 4',
+    ],
+  },
+  {
+    // Kaksi ensimmäistä viivaa ovat vene; vastaukset.js käyttää niitä ilman aaltoja.
+    nimi: 'paperivene',
+    viivat: [
+      'M10 56 L90 56 L74 74 L26 74 Z',
+      'M30 56 L50 16 L70 56',
+      'M4 84 Q14 78 24 84 Q34 90 44 84 Q54 78 64 84 Q74 90 84 84 Q90 80 96 84',
+    ],
+  },
+  {
+    nimi: 'hehkulamppu',
+    viivat: [
+      'M40 72 Q40 60 32 52 Q22 42 24 30 Q28 10 50 10 Q72 10 76 30 Q78 42 68 52 Q60 60 60 72 Z',
+      'M42 80 L58 80', 'M44 88 L56 88',
+      'M44 62 L44 48 L50 54 L56 48 L56 62',
+      ...[-160, -125, -55, -20].map((k) => säde(50, 34, k, 36, 46)),
+    ],
+  },
+  {
+    nimi: 'kuu ja tähdet',
+    viivat: ['M58 8 Q18 16 20 50 Q24 88 64 90 Q34 78 34 50 Q34 22 58 8 Z', pikkutahti(76, 30, 10), pikkutahti(84, 64, 7)],
+  },
+  {
+    nimi: 'lintu',
+    viivat: [
+      ympyra(48, 50, 22),
+      'M56 42 L56.6 44', 'M69 46 L80 50 L69 54', 'M30 56 Q36 68 50 64 Q44 54 30 56', 'M27 44 L14 38 L22 50',
+      'M44 72 L42 82', 'M54 72 L54 82',
+      'M4 84 Q50 80 96 86', 'M80 85 Q86 76 93 80 Q88 88 80 85',
     ],
   },
 ];
