@@ -328,12 +328,10 @@ const VASTAUKSET = {
     const nosto = koko * 0.36 + 3;
     return [{ kuva: kuva('etana'), cx: mx + nx * nosto, cy: my + ny * nosto, koko, kulma }];
   },
-  // Opettajan ympyrä ja 10/10.
+  // Arvosana 10/10 piirroksen viereen (ilman ympyröintiä).
   kymppi(p) {
-    const osat = [ympyroi(p)];
-    const oikealle = p.laatikko.x2 + 18;
-    osat.push({ kuva: SANAT.kymppi, cx: oikealle + 36, cy: p.laatikko.y1 + 4, koko: 32, kulma: -0.12 });
-    return osat;
+    // Leveys 230 yksikköä koossa 32 on noin 74 px, joten keskikohta on puolen leveyden päässä piirroksen reunasta.
+    return [{ kuva: SANAT.kymppi, cx: p.laatikko.x2 + 14 + 37, cy: p.laatikko.y1 + 4, koko: 32, kulma: -0.12 }];
   },
   vau(p) {
     return [{ kuva: SANAT.vau, cx: p.cx, cy: p.laatikko.y1 - 34, koko: 40, kulma: satunnainen(-0.12, 0.12) }];
@@ -361,19 +359,6 @@ const VASTAUKSET = {
     }));
   },
 };
-
-function ympyroi(p) {
-  const rx = p.w / 2 + 14, ry = p.h / 2 + 12;
-  const askelia = 40;
-  const alku = satunnainen(-2.6, -2.2);
-  let d = '';
-  for (let i = 0; i <= askelia; i++) {
-    const a = alku + (i / askelia) * Math.PI * 2.12; // vähän yli kierroksen, kuten käsin
-    const r = 1 + 0.04 * Math.sin(i * 0.5);
-    d += `${i ? 'L' : 'M'}${f(p.cx + Math.cos(a) * rx * r)} ${f(p.cy + Math.sin(a) * ry * r)} `;
-  }
-  return { d: d.trim() };
-}
 
 // Kävijän viivan y-koordinaatti kohdassa x (lähin piste).
 function viivanY(viiva, x) {
