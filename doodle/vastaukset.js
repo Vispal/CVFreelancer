@@ -48,12 +48,140 @@ export function tulkitse(viivat) {
   else if (suljettu) laji = 'silmukka';
   else if (yksi && koko >= 60 && w > 1.8 * h && kaannoksia >= 2 && janne / muste > 0.45) laji = 'aalto';
   else if (yksi && koko >= 60 && janne / muste > 0.85) {
+    // Suoran viivan kaltevuus vasemmalta oikealle: + = alamäki, − = ylämäki (ruudun y kasvaa alaspäin).
+    const [vas, oik] = alku[0] <= loppu[0] ? [alku, loppu] : [loppu, alku];
+    const kaltevuus = (Math.atan2(oik[1] - vas[1], oik[0] - vas[0]) * 180) / Math.PI;
+    if (Math.abs(kaltevuus) > 70) laji = 'pysty';
+    else if (kaltevuus > 20) laji = 'alamaki';
+    else if (kaltevuus < -20) laji = 'ylamaki';
     // Pitkä vaakasuora viiva on "maa", jolle piirtäjä piirtää aurinkoa ja puita.
-    laji = w >= 150 && h < 0.27 * w ? 'maa' : 'viiva';
+    else laji = w >= 150 && h < 0.27 * w ? 'maa' : 'viiva';
   }
+  else if (onRisti(viivat)) laji = 'risti';
   else if (muste / (w + h + 1) > 3) laji = 'sotku';
 
-  return { laji, laatikko: { x1, y1, x2, y2 }, cx: (x1 + x2) / 2, cy: (y1 + y2) / 2, w, h, koko, viivat, alku, loppu, suljettu };
+  // Nuoli tarkistetaan ennen sotkua: varsi ja kärki voivat olla yksi tai useampi veto.
+  const osoitin = laji === 'muu' || laji === 'sotku' || laji === 'viiva' ? tunnistaNuoli(viivat) : null;
+  if (osoitin) laji = 'osoitin';
+  const monikulmio = suljettu ? tunnistaMonikulmio(eka, koko) : null;
+
+  return {
+    laji, laatikko: { x1, y1, x2, y2 }, cx: (x1 + x2) / 2, cy: (y1 + y2) / 2, w, h, koko, viivat, alku, loppu, suljettu,
+    osoitin, monikulmio,
+  };
+}
+
+// --- apufunktiot tulkintaan ----------------------------------------------------------------------------------
+
+const etaisyysPisteet = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+function pituus(v) {
+  let L = 0;
+  for (let i = 1; i < v.length; i++) L += etaisyysPisteet(v[i], v[i - 1]);
+  return L;
+}
+// Viiva on suora, jos sen päiden etäisyys on lähes sama kuin sen pituus.
+const suora = (v, raja = 0.9) => {
+  const L = pituus(v);
+  return L > 0 && etaisyysPisteet(v[0], v[v.length - 1]) / L > raja;
+};
+
+// Kaksi suoraa, toisensa leikkaavaa ja eri suuntiin menevää vetoa: X.
+function onRisti(viivat) {
+  if (viivat.length !== 2) return false;
+  const [a, b] = viivat;
+  const La = pituus(a), Lb = pituus(b);
+  if (La < 24 || Lb < 24 || Math.min(La, Lb) / Math.max(La, Lb) < 0.45 || !suora(a, 0.85) || !suora(b, 0.85)) return false;
+  const [p1, p2, p3, p4] = [a[0], a[a.length - 1], b[0], b[b.length - 1]];
+  const ristitulo = (o, p, q) => (p[0] - o[0]) * (q[1] - o[1]) - (p[1] - o[1]) * (q[0] - o[0]);
+  const leikkaa = ristitulo(p1, p2, p3) * ristitulo(p1, p2, p4) < 0 && ristitulo(p3, p4, p1) * ristitulo(p3, p4, p2) < 0;
+  if (!leikkaa) return false;
+  const kulma = Math.abs(Math.atan2(p2[1] - p1[1], p2[0] - p1[0]) - Math.atan2(p4[1] - p3[1], p4[0] - p3[0])) % Math.PI;
+  return Math.min(kulma, Math.PI - kulma) > (40 * Math.PI) / 180;
+}
+
+// Nuoli: suora varsi ja sen toisessa päässä kärki, joka levenee varren molemmin puolin taaksepäin.
+// Palauttaa { karki, suunta, pituus } tai null.
+function tunnistaNuoli(viivat) {
+  const yritykset = [];
+  if (viivat.length === 1) {
+    // Yksi veto: varsi ensin ja kärki perään, tai kärki ensin ja varsi perään.
+    for (const v of [viivat[0], viivat[0].slice().reverse()]) {
+      let i = 2;
+      while (i < v.length && (pituus(v.slice(0, i + 1)) < 30 || suora(v.slice(0, i + 1), 0.95))) i++;
+      yritykset.push({ varsi: v.slice(0, i), karki: [v.slice(i - 1)] });
+    }
+  } else if (viivat.length <= 3) {
+    const jarjestys = viivat.slice().sort((a, b) => pituus(b) - pituus(a));
+    yritykset.push({ varsi: jarjestys[0], karki: jarjestys.slice(1) });
+  }
+  for (const { varsi, karki } of yritykset) {
+    const L = pituus(varsi);
+    const muste = karki.reduce((s, v) => s + pituus(v), 0);
+    if (L < 50 || !suora(varsi) || muste < 0.15 * L || muste > 1.3 * L) continue;
+    const pisteet = karki.flat();
+    for (const [karkiPiste, hanta] of [[varsi[varsi.length - 1], varsi[0]], [varsi[0], varsi[varsi.length - 1]]]) {
+      const raja = Math.min(0.5 * L, 70);
+      if (!pisteet.every((q) => etaisyysPisteet(q, karkiPiste) < raja)) continue;
+      const j = etaisyysPisteet(karkiPiste, hanta);
+      const u = [(karkiPiste[0] - hanta[0]) / j, (karkiPiste[1] - hanta[1]) / j];
+      let taakse = 0, vasen = false, oikea = false;
+      for (const q of pisteet) {
+        const dx = q[0] - karkiPiste[0], dy = q[1] - karkiPiste[1];
+        if (dx * u[0] + dy * u[1] < -3) taakse++;
+        const sivu = u[0] * dy - u[1] * dx;
+        if (sivu > 5) vasen = true;
+        if (sivu < -5) oikea = true;
+      }
+      if (taakse > pisteet.length * 0.5 && vasen && oikea) return { karki: karkiPiste, suunta: u, pituus: L };
+    }
+  }
+  return null;
+}
+
+// Suljetun vedon kulmat (Ramer–Douglas–Peucker ja suorien kohtien karsinta).
+// Palauttaa { nimi: 'kolmio' | 'suorakulmio', kulmat } tai null.
+function tunnistaMonikulmio(viiva, koko) {
+  const eps = 0.07 * koko;
+  const rdp = (v) => {
+    if (v.length < 3) return v;
+    const [a, b] = [v[0], v[v.length - 1]];
+    const L = etaisyysPisteet(a, b) || 1;
+    let suurin = 0, kohta = 0;
+    for (let i = 1; i < v.length - 1; i++) {
+      const d = Math.abs((b[0] - a[0]) * (a[1] - v[i][1]) - (a[0] - v[i][0]) * (b[1] - a[1])) / L;
+      if (d > suurin) { suurin = d; kohta = i; }
+    }
+    if (suurin <= eps) return [a, b];
+    return [...rdp(v.slice(0, kohta + 1)).slice(0, -1), ...rdp(v.slice(kohta))];
+  };
+  // Aloitetaan kauimmasta pisteestä, jotta alku ei osu keskelle sivua kahdesti.
+  const alku = viiva[0];
+  let kaukaisin = 0;
+  viiva.forEach((q, i) => { if (etaisyysPisteet(q, alku) > etaisyysPisteet(viiva[kaukaisin], alku)) kaukaisin = i; });
+  let kulmat = [...rdp(viiva.slice(0, kaukaisin + 1)).slice(0, -1), ...rdp(viiva.slice(kaukaisin))];
+  if (etaisyysPisteet(kulmat[0], kulmat[kulmat.length - 1]) < 0.25 * koko) kulmat.pop();
+  // Karsitaan kulmat, joissa viiva kääntyy vain vähän tai jotka ovat lähes päällekkäin.
+  const kaanto = (k, i) => {
+    const a = k[(i - 1 + k.length) % k.length], b = k[i], c = k[(i + 1) % k.length];
+    const d = Math.atan2(c[1] - b[1], c[0] - b[0]) - Math.atan2(b[1] - a[1], b[0] - a[0]);
+    return Math.abs(Math.atan2(Math.sin(d), Math.cos(d)));
+  };
+  let muuttui = true;
+  while (muuttui && kulmat.length > 3) {
+    muuttui = false;
+    for (let i = 0; i < kulmat.length; i++) {
+      const seuraava = kulmat[(i + 1) % kulmat.length];
+      if (kaanto(kulmat, i) < (35 * Math.PI) / 180 || etaisyysPisteet(kulmat[i], seuraava) < 0.15 * koko) {
+        kulmat.splice(i, 1);
+        muuttui = true;
+        break;
+      }
+    }
+  }
+  const aste = (180 / Math.PI);
+  if (kulmat.length === 3 && kulmat.every((_, i) => 180 - kaanto(kulmat, i) * aste > 20)) return { nimi: 'kolmio', kulmat };
+  if (kulmat.length === 4 && kulmat.every((_, i) => Math.abs(180 - kaanto(kulmat, i) * aste - 90) < 25)) return { nimi: 'suorakulmio', kulmat };
+  return null;
 }
 
 // --- muodon tunnistus (matkija) ----------------------------------------------------------------------------
@@ -285,6 +413,149 @@ Object.assign(VASTAUKSET, {
   },
 });
 
+// Kävijän suoran viivan päät: yläpää ja alapää, sekä piste viivalla osuuden t kohdalla yläpäästä.
+function rinne(p) {
+  const v = p.viivat[0];
+  const [yla, ala] = p.alku[1] <= p.loppu[1] ? [p.alku, p.loppu] : [p.loppu, p.alku];
+  const L = etaisyysPisteet(yla, ala);
+  const u = [(ala[0] - yla[0]) / L, (ala[1] - yla[1]) / L]; // alamäen suunta
+  // Normaali, joka osoittaa ylöspäin (viivan "yläpuolelle").
+  let n = [-u[1], u[0]];
+  if (n[1] > 0) n = [-n[0], -n[1]];
+  const kohta = (t) => {
+    const x = yla[0] + (ala[0] - yla[0]) * t, y = yla[1] + (ala[1] - yla[1]) * t;
+    let paras = v[0];
+    for (const q of v) if (Math.hypot(q[0] - x, q[1] - y) < Math.hypot(paras[0] - x, paras[1] - y)) paras = q;
+    return paras;
+  };
+  return { yla, ala, L, u, n, kohta };
+}
+
+// Loppupiste hieman alun yläpuolella, jotta kaari piirtyy täytenä ympyränä (pyöristys ei saa yhdistää niitä).
+const ympyraPolku = (cx, cy, r) => `M${f(cx + r)} ${f(cy)} A${f(r)} ${f(r)} 0 1 1 ${f(cx + r)} ${f(cy - 0.2)}`;
+const lippu = (x, y, suunta) =>
+  [{ d: `M${f(x)} ${f(y)} L${f(x)} ${f(y - 36)}` }, { d: `M${f(x)} ${f(y - 36)} L${f(x + suunta * 20)} ${f(y - 30)} L${f(x)} ${f(y - 24)}` }];
+
+Object.assign(VASTAUKSET, {
+  // Alamäki: pallo vierii alas vauhtiviivojen kanssa, ja vieressä lukee "wheee!".
+  pallo(p) {
+    const { u, n, kohta } = rinne(p);
+    const r = 9;
+    const [px, py] = kohta(0.68);
+    const c = [px + n[0] * (r + 2), py + n[1] * (r + 2)];
+    const osat = [{ d: ympyraPolku(c[0], c[1], r) }];
+    for (const [o, pit] of [[-4, 16], [1, 24], [6, 14]]) {
+      const ax = c[0] - u[0] * (r + 6) + n[0] * o, ay = c[1] - u[1] * (r + 6) + n[1] * o;
+      osat.push({ d: `M${f(ax)} ${f(ay)} L${f(ax - u[0] * pit)} ${f(ay - u[1] * pit)}` });
+    }
+    osat.push({ kuva: SANAT.wheee, cx: c[0] + n[0] * 30 + u[0] * 10, cy: c[1] - 30, koko: 30, kulma: satunnainen(-0.1, 0.1) });
+    return osat;
+  },
+  // Ylämäki: tikku-ukko kiipeää viivaa ylös, ja yläpäässä on lippu.
+  kiipeilija(p) {
+    const { yla, u, kohta } = rinne(p);
+    const s = Math.sign(yla[0] - p.cx) || 1; // ylämäen suunta vaakatasossa
+    const [px, py] = kohta(0.5);
+    const m = 1.4; // ukon koko
+    const jalka = (k) => [px - u[0] * 7 * m * k, py - u[1] * 7 * m * k - 1];
+    const [j1, j2] = [jalka(1), jalka(-1)];
+    const lantio = [px + s * 3 * m, py - 18 * m];
+    const kaula = [lantio[0] + s * 6 * m, lantio[1] - 15 * m];
+    const paa = [kaula[0] + s * 2 * m, kaula[1] - 7 * m];
+    return [
+      { d: `M${f(j1[0])} ${f(j1[1])} L${f(lantio[0])} ${f(lantio[1])} L${f(j2[0])} ${f(j2[1])}` },
+      { d: `M${f(lantio[0])} ${f(lantio[1])} L${f(kaula[0])} ${f(kaula[1])}` },
+      { d: ympyraPolku(paa[0], paa[1], 6 * m) },
+      { d: `M${f(kaula[0] - s * 9 * m)} ${f(kaula[1] + 9 * m)} L${f(kaula[0])} ${f(kaula[1])} L${f(kaula[0] + s * 11 * m)} ${f(kaula[1] - 6 * m)}` },
+      ...lippu(yla[0], yla[1] - 1, s),
+    ];
+  },
+  // Pystysuora viiva: kukan varsi. Kukka päähän ja lehdet sivuille.
+  kukkavarsi(p) {
+    const { yla, L, kohta } = rinne(p);
+    const k = Math.max(0.7, Math.min(1.2, L / 120));
+    const c = [yla[0], yla[1] - 26 * k];
+    const osat = [{ d: ympyraPolku(c[0], c[1], 6 * k) }];
+    const alku = satunnainen(0, 72);
+    for (let i = 0; i < 5; i++) {
+      const a = ((alku + i * 72) * Math.PI) / 180;
+      const pit = 24 * k, lev = pit * 0.5;
+      const q = (d, sivu) => [c[0] + Math.cos(a) * d - Math.sin(a) * sivu, c[1] + Math.sin(a) * d + Math.cos(a) * sivu];
+      const [a0, a1, a2, a3] = [q(7 * k, 0), q(pit, -lev), q(pit, 0), q(pit, lev)];
+      osat.push({ d: `M${f(a0[0])} ${f(a0[1])} Q${f(a1[0])} ${f(a1[1])} ${f(a2[0])} ${f(a2[1])} Q${f(a3[0])} ${f(a3[1])} ${f(a0[0])} ${f(a0[1])}` });
+    }
+    for (const [t, s] of [[0.55, -1], [0.75, 1]]) {
+      const [x, y] = kohta(t);
+      osat.push({ d: `M${f(x)} ${f(y)} Q${f(x + s * 10 * k)} ${f(y - 18 * k)} ${f(x + s * 26 * k)} ${f(y - 16 * k)} Q${f(x + s * 20 * k)} ${f(y - 2 * k)} ${f(x)} ${f(y)}` });
+    }
+    return osat;
+  },
+  // X: katkoviivapolku kompassilta aarteen luo.
+  aarre(p) {
+    const kulma = satunnainen(0, Math.PI * 2);
+    const D = 150 + p.koko / 2;
+    const k = [p.cx + Math.cos(kulma) * D, p.cy + Math.sin(kulma) * D];
+    const osat = [
+      { d: ympyraPolku(k[0], k[1], 15) },
+      { d: `M${f(k[0])} ${f(k[1] - 12)} L${f(k[0] + 4)} ${f(k[1] - 4)} L${f(k[0] + 12)} ${f(k[1])} L${f(k[0] + 4)} ${f(k[1] + 4)} L${f(k[0])} ${f(k[1] + 12)} L${f(k[0] - 4)} ${f(k[1] + 4)} L${f(k[0] - 12)} ${f(k[1])} L${f(k[0] - 4)} ${f(k[1] - 4)} Z` },
+      { d: `M${f(k[0] - 4)} ${f(k[1] - 22)} L${f(k[0] - 4)} ${f(k[1] - 32)} L${f(k[0] + 4)} ${f(k[1] - 22)} L${f(k[0] + 4)} ${f(k[1] - 32)}` },
+    ];
+    // Kaareva polku kompassin reunasta X:n reunaan.
+    const ux = (p.cx - k[0]) / D, uy = (p.cy - k[1]) / D;
+    // Polku alkaa kompassin reunasta, ja ylöspäin lähtiessä N-kirjaimen yläpuolelta.
+    const alkuun = 22 + Math.max(0, -uy) * 16;
+    const a = [k[0] + ux * alkuun, k[1] + uy * alkuun];
+    const b = [p.cx - ux * (p.koko / 2 + 12), p.cy - uy * (p.koko / 2 + 12)];
+    const taivutus = satunnainen(30, 50) * (Math.random() < 0.5 ? 1 : -1);
+    const c = [(a[0] + b[0]) / 2 - uy * taivutus, (a[1] + b[1]) / 2 + ux * taivutus];
+    const piste = (t) => [
+      (1 - t) ** 2 * a[0] + 2 * (1 - t) * t * c[0] + t * t * b[0],
+      (1 - t) ** 2 * a[1] + 2 * (1 - t) * t * c[1] + t * t * b[1],
+    ];
+    const katkoja = Math.max(5, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) / 18));
+    for (let i = 0; i < katkoja; i++) {
+      const [s, e] = [piste(i / katkoja), piste((i + 0.55) / katkoja)];
+      osat.push({ d: `M${f(s[0])} ${f(s[1])} L${f(e[0])} ${f(e[1])}` });
+    }
+    return osat;
+  },
+  // Kolmio kärki ylöspäin: vuori, jolla on lumihuippu ja lippu.
+  vuori(p) {
+    if (p.monikulmio?.nimi !== 'kolmio') return null;
+    const k = p.monikulmio.kulmat.slice().sort((a, b) => a[1] - b[1]);
+    const [huippu, ...juuret] = k;
+    if (juuret.some((q) => q[1] < huippu[1] + 0.4 * p.h)) return null;
+    const [vas, oik] = juuret.sort((a, b) => a[0] - b[0]);
+    const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+    const A = lerp(huippu, vas, 0.33), B = lerp(huippu, oik, 0.33);
+    const z = [A, ...[0.25, 0.5, 0.75].map((t, i) => { const q = lerp(A, B, t); return [q[0], q[1] + (i === 1 ? 1 : 9)]; }), B];
+    return [{ d: 'M' + z.map((q) => `${f(q[0])} ${f(q[1])}`).join(' L') }, ...lippu(huippu[0], huippu[1] - 2, 1)];
+  },
+  // Suorakulmio: lahjapaketti, jossa on nauha ja rusetti.
+  lahja(p) {
+    if (p.monikulmio?.nimi !== 'suorakulmio') return null;
+    const { x1, y1, x2, y2 } = p.laatikko;
+    const { cx, cy } = p;
+    const b = Math.max(12, Math.min(26, p.w * 0.22));
+    return [
+      { d: `M${f(cx - 4)} ${f(y1)} L${f(cx - 4)} ${f(y2)}` },
+      { d: `M${f(cx + 4)} ${f(y1)} L${f(cx + 4)} ${f(y2)}` },
+      { d: `M${f(x1)} ${f(cy - 4)} L${f(x2)} ${f(cy - 4)}` },
+      { d: `M${f(x1)} ${f(cy + 4)} L${f(x2)} ${f(cy + 4)}` },
+      { d: `M${f(cx)} ${f(y1)} Q${f(cx - 1.6 * b)} ${f(y1 - 1.3 * b)} ${f(cx - 1.1 * b)} ${f(y1 - 0.1 * b)} Q${f(cx - 0.6 * b)} ${f(y1 + 0.2 * b)} ${f(cx)} ${f(y1)}` },
+      { d: `M${f(cx)} ${f(y1)} Q${f(cx + 1.6 * b)} ${f(y1 - 1.3 * b)} ${f(cx + 1.1 * b)} ${f(y1 - 0.1 * b)} Q${f(cx + 0.6 * b)} ${f(y1 + 0.2 * b)} ${f(cx)} ${f(y1)}` },
+    ];
+  },
+  // Kävijän nuoli: maalitaulu sinne, minne nuoli osoittaa.
+  maalitaulu(p) {
+    if (!p.osoitin) return null;
+    const { karki, suunta, pituus: L } = p.osoitin;
+    const R = Math.max(22, Math.min(36, L * 0.35));
+    const c = [karki[0] + suunta[0] * (R + 8), karki[1] + suunta[1] * (R + 8)];
+    return [{ d: ympyraPolku(c[0], c[1], R) }, { d: ympyraPolku(c[0], c[1], R * 0.62) }, { d: ympyraPolku(c[0], c[1], R * 0.24) }];
+  },
+});
+
 // Mitkä vastaukset sopivat millekin piirrokselle, suosituimmuusjärjestyksessä (satunnaistetaan doodle.js:ssä).
 const SOPIVAT = {
   silmukka: ['kasvot', 'kissa', 'aurinko', 'ilmapallo'],
@@ -294,9 +565,18 @@ const SOPIVAT = {
   sotku: ['kymppi', 'vau'],
   piste: ['kysymys'],
   muu: ['tahdet', 'vau', 'kymppi', 'kehys'],
+  alamaki: ['pallo'],
+  ylamaki: ['kiipeilija'],
+  pysty: ['kukkavarsi'],
+  risti: ['aarre'],
+  osoitin: ['maalitaulu'],
 };
 // Jos mikään sopiva ei mahdu, kokeillaan näitä.
-const VARAT = { maa: ['etana', 'nuoli'], aalto: ['tahdet'] };
+const VARAT = {
+  maa: ['etana', 'nuoli'], aalto: ['tahdet'], alamaki: ['etana', 'nuoli'], ylamaki: ['etana', 'nuoli'], pysty: ['nuoli'],
+};
+// Näitä kokeillaan useamman kerran, koska ne arpovat paikkansa (esim. kompassin suunta).
+const YRITYKSET = { aarre: 6 };
 
 // Nämä vastaukset piirretään korkeintaan kerran sivun latauksen aikana.
 const KERRAN = ['vau'];
@@ -310,11 +590,15 @@ export function ehdokkaat(p, edellinen, kaytetyt = new Set()) {
   if (p.laji === 'muu' && p.viivat.length >= 3 && p.koko >= 70 && edellinen !== 'kehys' && Math.random() < 0.6) nimet.unshift('kehys');
   // Tunnistettu tähti tai sydän: matkija ensin.
   if (p.muoto) nimet.unshift('matkija');
+  // Kolmiosta tulee vuori ja suorakulmiosta lahja.
+  if (p.monikulmio?.nimi === 'kolmio') nimet.unshift('vuori');
+  if (p.monikulmio?.nimi === 'suorakulmio') nimet.unshift('lahja');
   nimet.push(...(VARAT[p.laji] || []));
   if (!nimet.includes('tahdet') && p.laji !== 'piste') nimet.push('tahdet');
   return [...new Set(nimet)]
     .filter((nimi) => !(KERRAN.includes(nimi) && kaytetyt.has(nimi)))
-    .map((nimi) => ({ nimi, osat: VASTAUKSET[nimi](p) })).filter((e) => e.osat && e.osat.length);
+    .flatMap((nimi) => Array.from({ length: YRITYKSET[nimi] || 1 }, () => ({ nimi, osat: VASTAUKSET[nimi](p) })))
+    .filter((e) => e.osat && e.osat.length);
 }
 
 // Sydän piirtäjän oman kuvan ja kävijän piirroksen väliin.
