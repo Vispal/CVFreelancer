@@ -32,9 +32,18 @@ const säde = (cx, cy, kulma, r1, r2) => {
   return `M${(cx + Math.cos(a) * r1).toFixed(1)} ${(cy + Math.sin(a) * r1).toFixed(1)} L${(cx + Math.cos(a) * r2).toFixed(1)} ${(cy + Math.sin(a) * r2).toFixed(1)}`;
 };
 
+const pikkutahti = (cx, cy, r) => {
+  let d = '';
+  for (let i = 0; i <= 10; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5;
+    const rr = i % 2 ? r * 0.45 : r;
+    d += `${i ? 'L' : 'M'}${(cx + Math.cos(a) * rr).toFixed(1)} ${(cy + Math.sin(a) * rr).toFixed(1)} `;
+  }
+  return d.trim();
+};
+
 export const SHAPES = [
   { nimi: 'tähti', viivat: ['M50 6 L61 38 L95 38 L67 58 L78 92 L50 71 L22 92 L33 58 L5 38 L39 38 Z'] },
-  { nimi: 'sydän', viivat: ['M50 88 C20 66 4 48 8 30 C12 12 38 8 50 30 C62 8 88 12 92 30 C96 48 80 66 50 88 Z'] },
   { nimi: 'hymiö', viivat: [ympyra(50, 50, 44), 'M36 34 L36 44', 'M64 34 L64 44', 'M27 60 Q50 84 73 60'] },
   { nimi: 'aurinko', viivat: [ympyra(50, 50, 20), ...[0, 45, 90, 135, 180, 225, 270, 315].map((k) => säde(50, 50, k, 28, 44))] },
   {
@@ -74,21 +83,65 @@ export const SHAPES = [
     viivat: ['M50 4 Q72 30 66 72 L34 72 Q28 30 50 4 Z', ympyra(50, 36, 7), 'M35 54 L20 80 L34 72', 'M65 54 L80 80 L66 72', 'M40 76 Q44 88 50 97 Q56 88 60 76'],
   },
   { nimi: 'spiraali', viivat: [spiraali(50, 50, 44, 3.2)] },
-  { nimi: 'nuoli', viivat: ['M8 74 Q40 12 86 40', 'M68 28 L87 41 L70 54'] },
   {
     nimi: 'etana',
     viivat: [spiraali(44, 58, 26, 2.4), 'M6 86 L80 86 Q94 86 92 72 L88 60', 'M88 60 L82 44', 'M91 62 L98 47'],
   },
   { nimi: 'paperilennokki', viivat: ['M6 50 L94 14 L60 90 L46 60 Z', 'M46 60 L94 14', 'M46 60 L42 80 L55 71'] },
   {
-    nimi: 'hei',
+    nimi: 'moi',
     viivat: [
-      'M8 14 L8 86', 'M8 58 Q20 40 30 56 L30 86',
-      'M42 67 L62 67 Q62 50 52 50 Q40 50 40 68 Q40 86 54 86 Q60 86 64 80',
-      'M74 52 L74 86', 'M73.6 36 L74.4 38.5',
-      'M88 14 L88 66', 'M87.6 81 L88.4 83.5',
+      'M6 86 L6 52 Q8 48 14 48 Q24 48 24 60 L24 86',
+      'M24 60 Q26 48 34 48 Q42 48 42 60 L42 86',
+      'M62 50 Q74 50 74 68 Q74 86 62 86 Q50 86 50 68 Q50 50 62 50',
+      'M84 52 L84 86', 'M83.6 36 L84.4 38.5',
+      'M96 14 L96 66', 'M95.6 81 L96.4 83.5',
     ],
   },
+  {
+    nimi: 'kahvikuppi',
+    viivat: [
+      'M22 44 L26 88 Q27 94 34 94 L62 94 Q69 94 70 88 L74 44 Z',
+      'M73 54 Q90 54 89 66 Q88 78 71 78',
+      'M36 36 Q30 28 36 20 Q42 12 36 4', 'M50 36 Q44 28 50 20 Q56 12 50 4', 'M64 36 Q58 28 64 20 Q70 12 64 4',
+    ],
+  },
+  {
+    // Kaksi ensimmäistä viivaa ovat vene; vastaukset.js käyttää niitä ilman aaltoja.
+    nimi: 'paperivene',
+    viivat: [
+      'M10 56 L90 56 L74 74 L26 74 Z',
+      'M30 56 L50 16 L70 56',
+      'M4 84 Q14 78 24 84 Q34 90 44 84 Q54 78 64 84 Q74 90 84 84 Q90 80 96 84',
+    ],
+  },
+  {
+    nimi: 'hehkulamppu',
+    viivat: [
+      'M40 72 Q40 60 32 52 Q22 42 24 30 Q28 10 50 10 Q72 10 76 30 Q78 42 68 52 Q60 60 60 72 Z',
+      'M42 80 L58 80', 'M44 88 L56 88',
+      'M44 62 L44 48 L50 54 L56 48 L56 62',
+      ...[-160, -125, -55, -20].map((k) => säde(50, 34, k, 36, 46)),
+    ],
+  },
+  {
+    nimi: 'kuu ja tähdet',
+    viivat: ['M58 8 Q18 16 20 50 Q24 88 64 90 Q34 78 34 50 Q34 22 58 8 Z', pikkutahti(76, 30, 10), pikkutahti(84, 64, 7)],
+  },
+  {
+    nimi: 'lintu',
+    viivat: [
+      ympyra(48, 50, 22),
+      'M56 42 L56.6 44', 'M69 46 L80 50 L69 54', 'M30 56 Q36 68 50 64 Q44 54 30 56', 'M27 44 L14 38 L22 50',
+      'M44 72 L42 82', 'M54 72 L54 82',
+      'M4 84 Q50 80 96 86', 'M80 85 Q86 76 93 80 Q88 88 80 85',
+    ],
+  },
+];
+
+// Kuvat, joita piirtäjä käyttää vain vastauksissa (ei omina piirroksinaan).
+export const VASTAUSKUVAT = [
+  { nimi: 'sydän', viivat: ['M50 88 C20 66 4 48 8 30 C12 12 38 8 50 30 C62 8 88 12 92 30 C96 48 80 66 50 88 Z'] },
 ];
 
 // Piirtäjän käsin kirjoittamat sanat vastauksiin. Leveys kertoo ruudun leveyden (korkeus aina 100).

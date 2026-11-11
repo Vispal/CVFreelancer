@@ -4,9 +4,9 @@
 // Vastaus on lista osia, jotka ovat joko
 //   { d }                               SVG-polku suoraan näytön koordinaateissa, tai
 //   { kuva, cx, cy, koko, kulma }       kuva tai sana kirjastosta (shapes.js), keskitettynä pisteeseen.
-import { SHAPES, SANAT } from './shapes.js';
+import { SHAPES, VASTAUSKUVAT, SANAT } from './shapes.js';
 
-const kuva = (nimi) => SHAPES.find((s) => s.nimi === nimi);
+const kuva = (nimi) => SHAPES.find((s) => s.nimi === nimi) || VASTAUSKUVAT.find((s) => s.nimi === nimi);
 const satunnainen = (a, b) => a + Math.random() * (b - a);
 const f = (n) => n.toFixed(1);
 
@@ -30,13 +30,70 @@ export function tulkitse(viivat) {
   const janne = Math.hypot(loppu[0] - alku[0], loppu[1] - alku[1]);
   const yksi = viivat.length === 1;
 
+  // Kuinka monta kertaa viiva vaihtaa pystysuuntaa (aaltoviivan tunnistamiseen).
+  let kaannoksia = 0;
+  let suunta = 0;
+  let ref = eka[0][1];
+  for (const [, y] of eka) {
+    if (Math.abs(y - ref) < 6) continue;
+    const s = Math.sign(y - ref);
+    if (suunta && s !== suunta) kaannoksia++;
+    suunta = s;
+    ref = y;
+  }
+
+  const suljettu = yksi && koko >= 20 && janne < 0.25 * koko && muste > 2.2 * koko;
   let laji = 'muu';
   if (koko < 14) laji = 'piste';
-  else if (yksi && koko >= 36 && janne < 0.25 * koko && muste > 2.2 * koko) laji = 'silmukka';
-  else if (yksi && koko >= 60 && janne / muste > 0.85) laji = 'viiva';
+  else if (suljettu) laji = 'silmukka';
+  else if (yksi && koko >= 60 && w > 1.8 * h && kaannoksia >= 2 && janne / muste > 0.45) laji = 'aalto';
+  else if (yksi && koko >= 60 && janne / muste > 0.85) {
+    // Pitkä vaakasuora viiva on "maa", jolle piirtäjä piirtää aurinkoa ja puita.
+    laji = w >= 150 && h < 0.27 * w ? 'maa' : 'viiva';
+  }
   else if (muste / (w + h + 1) > 3) laji = 'sotku';
 
-  return { laji, laatikko: { x1, y1, x2, y2 }, cx: (x1 + x2) / 2, cy: (y1 + y2) / 2, w, h, koko, viivat, alku, loppu };
+  return { laji, laatikko: { x1, y1, x2, y2 }, cx: (x1 + x2) / 2, cy: (y1 + y2) / 2, w, h, koko, viivat, alku, loppu, suljettu };
+}
+
+// --- muodon tunnistus (matkija) ----------------------------------------------------------------------------
+// Verrataan kävijän piirrosta malleihin pistepilvinä: molemmat skaalataan samaan ruutuun, ja etäisyys on
+// pisteiden keskimääräinen etäisyys lähimpään vastinpisteeseen. Ei riipu siitä, mistä tai mihin suuntaan
+// kävijä aloitti. Mallit (tähti, sydän ja vertailuksi ympyrä) näytteistää doodle.js.
+
+function normalisoi(pisteet, n = 40) {
+  const k = [0];
+  for (let i = 1; i < pisteet.length; i++) k.push(k[i - 1] + Math.hypot(pisteet[i][0] - pisteet[i - 1][0], pisteet[i][1] - pisteet[i - 1][1]));
+  const L = k[k.length - 1] || 1;
+  const tasan = [];
+  let j = 1;
+  for (let i = 0; i < n; i++) {
+    const m = (L * i) / n;
+    while (j < k.length - 1 && k[j] < m) j++;
+    const t = k[j] === k[j - 1] ? 0 : (m - k[j - 1]) / (k[j] - k[j - 1]);
+    tasan.push([pisteet[j - 1][0] + (pisteet[j][0] - pisteet[j - 1][0]) * t, pisteet[j - 1][1] + (pisteet[j][1] - pisteet[j - 1][1]) * t]);
+  }
+  let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+  for (const [x, y] of tasan) { x1 = Math.min(x1, x); y1 = Math.min(y1, y); x2 = Math.max(x2, x); y2 = Math.max(y2, y); }
+  const s = Math.max(x2 - x1, y2 - y1) || 1;
+  return tasan.map(([x, y]) => [(x - (x1 + x2) / 2) / s, (y - (y1 + y2) / 2) / s]);
+}
+
+function etaisyys(a, b) {
+  const yksisuuntainen = (p, q) => p.reduce((sum, [x, y]) => sum + Math.min(...q.map(([u, v]) => Math.hypot(x - u, y - v))), 0) / p.length;
+  return (yksisuuntainen(a, b) + yksisuuntainen(b, a)) / 2;
+}
+
+// mallit: { nimi: pistelista }. Palauttaa tunnistetun muodon nimen tai null.
+export function tunnista(p, mallit) {
+  if (!p.suljettu || p.koko < 30) return null;
+  const oma = normalisoi(p.viivat[0]);
+  const tulokset = Object.entries(mallit)
+    .map(([nimi, pisteet]) => ({ nimi, d: etaisyys(oma, normalisoi(pisteet)) }))
+    .sort((a, b) => a.d - b.d);
+  const paras = tulokset[0];
+  if (paras.nimi === 'ympyrä' || paras.d > 0.06) return null;
+  return paras.nimi;
 }
 
 // --- vastaukset --------------------------------------------------------------------------------------------
@@ -154,22 +211,105 @@ function ympyroi(p) {
   return { d: d.trim() };
 }
 
+// Kävijän viivan y-koordinaatti kohdassa x (lähin piste).
+function viivanY(viiva, x) {
+  let paras = viiva[0];
+  for (const q of viiva) if (Math.abs(q[0] - x) < Math.abs(paras[0] - x)) paras = q;
+  return paras[1];
+}
+
+const PUU = {
+  nimi: 'puu',
+  leveys: 100,
+  viivat: [
+    'M45 96 L46 64', 'M55 96 L54 64',
+    'M46 64 Q24 66 26 46 Q22 26 40 22 Q50 6 64 18 Q82 20 78 42 Q84 62 54 64',
+  ],
+};
+
+Object.assign(VASTAUKSET, {
+  // Paperivene seilaa aaltoviivalla.
+  vene(p) {
+    const vene = kuva('paperivene');
+    const koko = 56;
+    const x = p.cx + satunnainen(-0.2, 0.2) * p.w;
+    // Veneen pohja on kuvassa y = 74, eli 24 % koosta keskikohdan alapuolella.
+    const y = viivanY(p.viivat[0], x) - 0.24 * koko - 2;
+    return [{ kuva: { ...vene, viivat: vene.viivat.slice(0, 2) }, cx: x, cy: y, koko, kulma: satunnainen(-0.08, 0.08) }];
+  },
+  // Taulun kehys, naula ja naru isomman piirroksen ympärille.
+  kehys(p) {
+    if (p.viivat.length < 3 || p.koko < 70) return null;
+    const r = 16;
+    const x1 = p.laatikko.x1 - r, y1 = p.laatikko.y1 - r, x2 = p.laatikko.x2 + r, y2 = p.laatikko.y2 + r;
+    const naula = [p.cx, y1 - 24];
+    return [
+      { d: `M${f(x1)} ${f(y1)} L${f(x2)} ${f(y1)} L${f(x2)} ${f(y2)} L${f(x1)} ${f(y2)} Z` },
+      { d: `M${f(x1 + 7)} ${f(y1 + 7)} L${f(x2 - 7)} ${f(y1 + 7)} L${f(x2 - 7)} ${f(y2 - 7)} L${f(x1 + 7)} ${f(y2 - 7)} Z` },
+      { d: `M${f(x1 + p.w * 0.2)} ${f(y1)} L${f(naula[0])} ${f(naula[1])} L${f(x2 - p.w * 0.2)} ${f(y1)}` },
+      { d: `M${f(naula[0] - 3)} ${f(naula[1] - 3)} L${f(naula[0] + 3)} ${f(naula[1] + 3)}` },
+    ];
+  },
+  // Aurinko ja puita "maan" päälle.
+  maisema(p) {
+    const v = p.viivat[0];
+    const vasen = p.laatikko.x1, lev = p.w;
+    const puolet = Math.random() < 0.5;
+    const auringonX = vasen + lev * (puolet ? 0.78 : 0.22);
+    const osat = [{ kuva: kuva('aurinko'), cx: auringonX, cy: viivanY(v, auringonX) - 150, koko: 66, kulma: 0 }];
+    const puut = lev > 260 ? [0.3, 0.48] : [0.42];
+    for (const t of puut) {
+      const x = vasen + lev * (puolet ? t : 1 - t);
+      const koko = satunnainen(80, 100);
+      // Puun juuret ovat kuvassa y = 96.
+      osat.push({ kuva: PUU, cx: x, cy: viivanY(v, x) - 0.46 * koko + 1, koko, kulma: 0 });
+    }
+    return osat;
+  },
+  // Naru ja rusetti pienen silmukan alle: siitä tulee ilmapallo.
+  ilmapallo(p) {
+    if (p.koko > 110) return null;
+    const x = p.cx, y = p.laatikko.y2;
+    return [
+      { d: `M${f(x - 5)} ${f(y + 7)} L${f(x)} ${f(y + 1)} L${f(x + 5)} ${f(y + 7)} Z` },
+      { d: `M${f(x)} ${f(y + 7)} Q${f(x - 9)} ${f(y + 26)} ${f(x)} ${f(y + 44)} Q${f(x + 9)} ${f(y + 62)} ${f(x)} ${f(y + 80)}` },
+    ];
+  },
+  // Kävijä piirsi tähden tai sydämen: piirtäjä piirtää pienen samanlaisen viereen.
+  matkija(p) {
+    if (!p.muoto) return null;
+    const koko = Math.max(28, Math.min(54, p.koko * 0.55));
+    const oikealle = Math.random() < 0.5 ? 1 : -1;
+    const x = oikealle > 0 ? p.laatikko.x2 + 14 + koko / 2 : p.laatikko.x1 - 14 - koko / 2;
+    return [{ kuva: kuva(p.muoto), cx: x, cy: p.cy + satunnainen(-0.2, 0.2) * p.h, koko, kulma: satunnainen(-0.25, 0.25) }];
+  },
+});
+
 // Mitkä vastaukset sopivat millekin piirrokselle, suosituimmuusjärjestyksessä (satunnaistetaan doodle.js:ssä).
 const SOPIVAT = {
-  silmukka: ['kasvot', 'kissa', 'aurinko'],
+  silmukka: ['kasvot', 'kissa', 'aurinko', 'ilmapallo'],
   viiva: ['etana', 'nuoli'],
+  maa: ['maisema'],
+  aalto: ['vene'],
   sotku: ['kymppi', 'vau'],
   piste: ['kysymys'],
-  muu: ['tahdet', 'vau', 'kymppi'],
+  muu: ['tahdet', 'vau', 'kymppi', 'kehys'],
 };
+// Jos mikään sopiva ei mahdu, kokeillaan näitä.
+const VARAT = { maa: ['etana', 'nuoli'], aalto: ['tahdet'] };
 
 // Palauttaa ehdokkaat [{ nimi, osat }] siinä järjestyksessä kuin niitä kannattaa kokeilla.
 export function ehdokkaat(p, edellinen) {
   const nimet = SOPIVAT[p.laji].slice().sort(() => Math.random() - 0.5);
   // Ei samaa vastausta kahdesti peräkkäin, jos muutakin on tarjolla.
   nimet.sort((a, b) => (a === edellinen) - (b === edellinen));
+  // Moniviivainen iso piirros saa useimmiten kehyksen.
+  if (p.laji === 'muu' && p.viivat.length >= 3 && p.koko >= 70 && edellinen !== 'kehys' && Math.random() < 0.6) nimet.unshift('kehys');
+  // Tunnistettu tähti tai sydän: matkija ensin.
+  if (p.muoto) nimet.unshift('matkija');
+  nimet.push(...(VARAT[p.laji] || []));
   if (!nimet.includes('tahdet') && p.laji !== 'piste') nimet.push('tahdet');
-  return nimet.map((nimi) => ({ nimi, osat: VASTAUKSET[nimi](p) })).filter((e) => e.osat && e.osat.length);
+  return [...new Set(nimet)].map((nimi) => ({ nimi, osat: VASTAUKSET[nimi](p) })).filter((e) => e.osat && e.osat.length);
 }
 
 // Sydän piirtäjän oman kuvan ja kävijän piirroksen väliin.

@@ -3,8 +3,8 @@
 // Kävijä voi piirtää itse hiirellä muualle kuin korttien päälle. Kortit, logo ja alatunniste jätetään piirtäjältä
 // aina rauhaan. Kun kävijä piirtää, piirtäjä vastaa hetken päästä piirtämällä jotain sen ympärille (vastaukset.js).
 // Ei evästeitä, ei tallennusta, ei verkkopyyntöjä.
-import { SHAPES } from './shapes.js';
-import { tulkitse, ehdokkaat, sydanValiin, KIITOS } from './vastaukset.js';
+import { SHAPES, VASTAUSKUVAT } from './shapes.js';
+import { tulkitse, tunnista, ehdokkaat, sydanValiin, KIITOS } from './vastaukset.js';
 
 const ASETUKSET = {
   alkuviive: 4000, // ms sivun latautumisesta ensimmäiseen kuvaan
@@ -576,6 +576,7 @@ function vastaa() {
   const viivat = merkinnat.flatMap((m) => m.viivat).filter((v) => v.length > 0);
   if (!viivat.length) return;
   const p = tulkitse(viivat);
+  p.muoto = tunnista(p, mallit());
 
   // Jos kävijä piirsi piirtäjän oman kuvan viereen, piirtäjä vastaa joskus sydämellä niiden väliin.
   const omat = piirretyt.filter((m) => m.tyyppi === 'piirtaja' && !m.vastaus);
@@ -596,6 +597,20 @@ function vastaa() {
     vastauksia++;
     return;
   }
+}
+
+// Tähden, sydämen ja ympyrän pistepilvet matkijaa varten (lasketaan kerran).
+let malliVarasto = null;
+function mallit() {
+  if (!malliVarasto) {
+    const d = (nimi) => [...SHAPES, ...VASTAUSKUVAT].find((s) => s.nimi === nimi).viivat[0];
+    malliVarasto = {
+      tähti: naytteet(d('tähti'), suoraan),
+      sydän: naytteet(d('sydän'), suoraan),
+      ympyrä: naytteet('M90 50 A40 40 0 1 1 90 49.99', suoraan),
+    };
+  }
+  return malliVarasto;
 }
 
 // Muuttaa vastauksen osat pistelistoiksi näytön koordinaateissa ja laskee niiden laatikon.
