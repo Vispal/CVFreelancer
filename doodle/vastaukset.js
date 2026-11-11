@@ -99,6 +99,17 @@ function onRisti(viivat) {
   return Math.min(kulma, Math.PI - kulma) > (40 * Math.PI) / 180;
 }
 
+// Kahden vedon (päätepisteiden välisten janojen) leikkauspiste tai null.
+function leikkauspiste(viivat) {
+  if (viivat.length !== 2) return null;
+  const [a, b] = viivat;
+  const [p1, p2, p3, p4] = [a[0], a[a.length - 1], b[0], b[b.length - 1]];
+  const d = (p2[0] - p1[0]) * (p4[1] - p3[1]) - (p2[1] - p1[1]) * (p4[0] - p3[0]);
+  if (!d) return null;
+  const t = ((p3[0] - p1[0]) * (p4[1] - p3[1]) - (p3[1] - p1[1]) * (p4[0] - p3[0])) / d;
+  return [p1[0] + (p2[0] - p1[0]) * t, p1[1] + (p2[1] - p1[1]) * t];
+}
+
 // Nuoli: suora varsi ja sen toisessa päässä kärki, joka levenee varren molemmin puolin taaksepäin.
 // Palauttaa { karki, suunta, pituus } tai null.
 function tunnistaNuoli(viivat) {
@@ -437,7 +448,7 @@ const lippu = (x, y, suunta) =>
   [{ d: `M${f(x)} ${f(y)} L${f(x)} ${f(y - 36)}` }, { d: `M${f(x)} ${f(y - 36)} L${f(x + suunta * 20)} ${f(y - 30)} L${f(x)} ${f(y - 24)}` }];
 
 Object.assign(VASTAUKSET, {
-  // Alamäki: pallo vierii alas vauhtiviivojen kanssa, ja vieressä lukee "wheee!".
+  // Alamäki: pallo vierii alas vauhtiviivojen kanssa, ja vieressä lukee "jeee!".
   pallo(p) {
     const { u, n, kohta } = rinne(p);
     const r = 9;
@@ -448,7 +459,7 @@ Object.assign(VASTAUKSET, {
       const ax = c[0] - u[0] * (r + 6) + n[0] * o, ay = c[1] - u[1] * (r + 6) + n[1] * o;
       osat.push({ d: `M${f(ax)} ${f(ay)} L${f(ax - u[0] * pit)} ${f(ay - u[1] * pit)}` });
     }
-    osat.push({ kuva: SANAT.wheee, cx: c[0] + n[0] * 30 + u[0] * 10, cy: c[1] - 30, koko: 30, kulma: satunnainen(-0.1, 0.1) });
+    osat.push({ kuva: SANAT.jeee, cx: c[0] + n[0] * 30 + u[0] * 6, cy: c[1] - 30, koko: 32, kulma: satunnainen(-0.1, 0.1) });
     return osat;
   },
   // Ylämäki: tikku-ukko kiipeää viivaa ylös, ja yläpäässä on lippu.
@@ -505,7 +516,8 @@ Object.assign(VASTAUKSET, {
     // Polku alkaa kompassin reunasta, ja ylöspäin lähtiessä N-kirjaimen yläpuolelta.
     const alkuun = 22 + Math.max(0, -uy) * 16;
     const a = [k[0] + ux * alkuun, k[1] + uy * alkuun];
-    const b = [p.cx - ux * (p.koko / 2 + 12), p.cy - uy * (p.koko / 2 + 12)];
+    // Polku päättyy X:n viivojen leikkauskohtaan.
+    const b = leikkauspiste(p.viivat) || [p.cx, p.cy];
     const taivutus = satunnainen(30, 50) * (Math.random() < 0.5 ? 1 : -1);
     const c = [(a[0] + b[0]) / 2 - uy * taivutus, (a[1] + b[1]) / 2 + ux * taivutus];
     const piste = (t) => [
@@ -514,7 +526,8 @@ Object.assign(VASTAUKSET, {
     ];
     const katkoja = Math.max(5, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) / 18));
     for (let i = 0; i < katkoja; i++) {
-      const [s, e] = [piste(i / katkoja), piste((i + 0.55) / katkoja)];
+      // Viimeinen katko päättyy täsmälleen leikkauskohtaan.
+      const [s, e] = [piste((i + 0.45) / katkoja), piste((i + 1) / katkoja)];
       osat.push({ d: `M${f(s[0])} ${f(s[1])} L${f(e[0])} ${f(e[1])}` });
     }
     return osat;
