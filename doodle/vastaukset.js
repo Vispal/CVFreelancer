@@ -485,16 +485,19 @@ Object.assign(VASTAUKSET, {
   kukkavarsi(p) {
     const { yla, L, kohta } = rinne(p);
     const k = Math.max(0.7, Math.min(1.2, L / 120));
-    const c = [yla[0], yla[1] - 26 * k];
+    const c = [yla[0], yla[1] - 21 * k];
     const osat = [{ d: ympyraPolku(c[0], c[1], 6 * k) }];
-    const alku = satunnainen(0, 72);
+    // Terälehdet yhtenä yhtenäisenä viivana: pyöreä kaari kärjestä toiseen, ja lehtien välissä kolo lähellä keskustaa.
+    const alku = (satunnainen(0, 72) * Math.PI) / 180;
+    const piste = (r, a) => [c[0] + Math.cos(a) * r, c[1] + Math.sin(a) * r];
+    const kolo = (i) => piste(8 * k, alku + ((i - 0.5) * 2 * Math.PI) / 5);
+    let terat = `M${f(kolo(0)[0])} ${f(kolo(0)[1])}`;
     for (let i = 0; i < 5; i++) {
-      const a = ((alku + i * 72) * Math.PI) / 180;
-      const pit = 24 * k, lev = pit * 0.5;
-      const q = (d, sivu) => [c[0] + Math.cos(a) * d - Math.sin(a) * sivu, c[1] + Math.sin(a) * d + Math.cos(a) * sivu];
-      const [a0, a1, a2, a3] = [q(7 * k, 0), q(pit, -lev), q(pit, 0), q(pit, lev)];
-      osat.push({ d: `M${f(a0[0])} ${f(a0[1])} Q${f(a1[0])} ${f(a1[1])} ${f(a2[0])} ${f(a2[1])} Q${f(a3[0])} ${f(a3[1])} ${f(a0[0])} ${f(a0[1])}` });
+      const a = alku + (i * 2 * Math.PI) / 5;
+      const [c1, c2, loppu] = [piste(31 * k, a - 0.62), piste(31 * k, a + 0.62), kolo(i + 1)];
+      terat += ` C${f(c1[0])} ${f(c1[1])} ${f(c2[0])} ${f(c2[1])} ${f(loppu[0])} ${f(loppu[1])}`;
     }
+    osat.push({ d: terat });
     for (const [t, s] of [[0.55, -1], [0.75, 1]]) {
       const [x, y] = kohta(t);
       osat.push({ d: `M${f(x)} ${f(y)} Q${f(x + s * 10 * k)} ${f(y - 18 * k)} ${f(x + s * 26 * k)} ${f(y - 16 * k)} Q${f(x + s * 20 * k)} ${f(y - 2 * k)} ${f(x)} ${f(y)}` });
