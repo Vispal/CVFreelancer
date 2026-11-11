@@ -1,5 +1,6 @@
-# Cloudflare Pages -vastausotsakkeet. Sivuilla ei ole omaa JavaScriptiä. Ainoa sallittu skripti on Cloudflaren
+# Cloudflare Pages -vastausotsakkeet. Alasivuilla ei ole omaa JavaScriptiä: niillä ainoa sallittu skripti on Cloudflaren
 # sähköpostiosoitteiden suojauksen purkuskripti (/cdn-cgi/scripts/.../email-decode.min.js), jonka Cloudflare lisää sivuille.
+# Etusivu (/) sallii lisäksi omat skriptit ('self') piirtäjää varten (/doodle/doodle.js ja /doodle/shapes.js).
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
@@ -9,7 +10,7 @@
 
 # CSP vain HTML-sivuille, jotta selainten PDF-katselimet toimivat varmasti.
 /
-  Content-Security-Policy: default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src https://jussivirta.fi/cdn-cgi/scripts/; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self' https://jussivirta.fi/cdn-cgi/scripts/; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
 /*/
   Content-Security-Policy: default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src https://jussivirta.fi/cdn-cgi/scripts/; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
 /*.html
