@@ -10,7 +10,7 @@ A minimal static CV / personal website built with plain HTML and CSS.
 - `fontit/` – Atkinson Hyperlegible and Caveat (OFL) used by the front page, and Archivo (OFL) used by the CV page. No external font services are used.
 - `assets/` – images and downloadable PDFs
 - `_redirects` – Cloudflare Pages redirects: /cv to /CV/ and the retired /freelance/ page to /digipalvelut/
-- `_headers` – security headers (CSP, HSTS, frame and referrer policy)
+- `_headers` – security headers (CSP, HSTS, frame and referrer policy). The CSP allows scripts only from `https://jussivirta.fi/cdn-cgi/scripts/`, so that Cloudflare Email Address Obfuscation can decode the email addresses; the site has no JavaScript of its own
 - `robots.txt`, `sitemap.xml` – search engine files; update `sitemap.xml` when pages are added
 
 ## Local preview
