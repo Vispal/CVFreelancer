@@ -1,6 +1,7 @@
 // Etusivun "salaperäinen piirtäjä": hetken kuluttua sivun avaamisesta kynä piirtää ruutupaperille pieniä
 // kuvia (tähti, kissa, hymiö...). Vain työpöydällä hiirellä, ei kun käyttäjä on pyytänyt vähemmän liikettä.
-// Kortit, logo ja alatunniste jätetään aina rauhaan. Ei evästeitä, ei tallennusta, ei verkkopyyntöjä.
+// Kävijä voi piirtää itse hiirellä muualle kuin korttien päälle. Kortit, logo ja alatunniste jätetään piirtäjältä
+// aina rauhaan. Ei evästeitä, ei tallennusta, ei verkkopyyntöjä.
 import { SHAPES } from './shapes.js';
 
 const ASETUKSET = {
@@ -14,9 +15,14 @@ const ASETUKSET = {
   reunus: 24, // px tyhjää suojattujen alueiden ja ruudun reunan ympärillä
   ruutu: 24, // ruutupaperin ruudun koko
   heilunta: 0.45, // px käsialan heilunta
+  korttireunus: 6, // px: kävijän viiva katkeaa näin lähellä korttia
+  enintaanViivoja: 300, // kävijän viivoja sivulla; vanhimmat häivytetään
 };
 
 const SUOJATUT = '.choice, header .logo, header small, footer .wrap > *';
+const KORTIT = '.choice';
+// Näistä ei aloiteta piirtoa: linkit ja painikkeet toimivat, ja ylä- ja alatunnisteen tekstin voi yhä valita.
+const EI_ALOITUSTA = '.choice, a, button, input, textarea, select, label, header .wrap > *, footer .wrap > *';
 const SVGNS = 'http://www.w3.org/2000/svg';
 
 const sopii =
@@ -26,7 +32,10 @@ const sopii =
 if (sopii) {
   const kaynnista = () => {
     const idle = window.requestIdleCallback || ((f) => setTimeout(f, 200));
-    idle(() => ajastin.aseta(aloita, ASETUKSET.alkuviive));
+    idle(() => {
+      aloita();
+      ajastin.aseta(seuraava, ASETUKSET.alkuviive);
+    });
   };
   if (document.readyState === 'complete') kaynnista();
   else window.addEventListener('load', kaynnista, { once: true });
@@ -77,9 +86,11 @@ document.addEventListener('visibilitychange', () => {
 let kerros = null; // <svg id="doodles">
 let mittari = null; // piilotettu polku viivojen mittaamiseen
 let kyna = null;
-const piirretyt = []; // { g, laatikko }
+const piirretyt = []; // { g, laatikko, tyyppi: 'piirtaja' | 'kavija', viivat? }
 let pussi = [];
 let maara = 0;
+let hiljaa = false; // kävijä pysäytti piirtäjän
+let ohjaimet = null;
 
 function aloita() {
   kerros = el('svg', { id: 'doodles', 'aria-hidden': 'true', focusable: 'false' });
@@ -89,19 +100,22 @@ function aloita() {
   kerros.appendChild(kyna);
   const sivu = document.querySelector('.page') || document.body;
   sivu.prepend(kerros);
+  kavijanKyna();
+  teeOhjaimet();
 
   let viive = 0;
   window.addEventListener('resize', () => {
     clearTimeout(viive);
     viive = setTimeout(siivoaPeittavat, 200);
   });
-
-  seuraava();
 }
 
 function seuraava() {
-  if (maara >= ASETUKSET.enintaan) return;
-  if (piirraKuva()) maara++;
+  if (hiljaa || maara >= ASETUKSET.enintaan) return;
+  if (piirraKuva()) {
+    maara++;
+    naytaOhjaimet();
+  }
   if (maara < ASETUKSET.enintaan) ajastin.aseta(seuraava, satunnainen(...ASETUKSET.tauko));
 }
 
@@ -152,15 +166,20 @@ function siivoaPeittavat() {
   const w = window.innerWidth;
   const h = window.innerHeight;
   const esteet = suojatutAlueet();
+  const kortit = korttiAlueet();
   for (let i = piirretyt.length - 1; i >= 0; i--) {
-    const { g, laatikko: l } = piirretyt[i];
-    const ulkona = l.x2 > w || l.y2 > h;
-    if (ulkona || esteet.some((e) => leikkaa(l, e))) {
-      piirretyt.splice(i, 1);
-      g.classList.add('pois');
-      setTimeout(() => g.remove(), 600);
-    }
+    const { laatikko: l, tyyppi } = piirretyt[i];
+    const poista =
+      tyyppi === 'kavija' ? kortit.some((e) => leikkaa(l, e)) : l.x2 > w || l.y2 > h || esteet.some((e) => leikkaa(l, e));
+    if (poista) hayta(i);
   }
+}
+
+// Häivyttää ja poistaa piirroksen kohdasta i.
+function hayta(i) {
+  const [{ g }] = piirretyt.splice(i, 1);
+  g.classList.add('pois');
+  setTimeout(() => g.remove(), 600);
 }
 
 // --- viivojen muuttaminen käsin piirretyiksi ---------------------------------------------------------------
@@ -243,7 +262,7 @@ function piirraKuva() {
 
   const g = el('g', { class: 'piirros', 'data-kuva': kuva.nimi, 'stroke-width': satunnainen(3.2, 3.8).toFixed(2) });
   kerros.insertBefore(g, kyna);
-  piirretyt.push({ g, laatikko });
+  piirretyt.push({ g, laatikko, tyyppi: 'piirtaja' });
 
   const viivat = kuva.viivat.map((d) => {
     const pisteet = kasinPiirretty(d, muunna);
@@ -255,11 +274,11 @@ function piirraKuva() {
     return { p, pisteet, k, pituus };
   });
 
-  animoi(viivat);
+  animoi(viivat, g);
   return true;
 }
 
-function animoi(viivat) {
+function animoi(viivat, g) {
   let i = 0;
   let matka = 0;
   let nosto = -1; // ms jäljellä nostossa, -1 = piirretään
@@ -270,6 +289,10 @@ function animoi(viivat) {
   kyna.classList.add('nakyy');
 
   const askel = (nyt) => {
+    if (!g.isConnected || g.classList.contains('pois')) {
+      kyna.classList.remove('nakyy'); // kävijä pyyhki paperin kesken piirron
+      return;
+    }
     const dt = Math.min(50, nyt - edellinen); // piilossa ollut välilehti ei hyppää eteenpäin
     edellinen = nyt;
     const v = viivat[i];
@@ -324,4 +347,165 @@ function teeKyna() {
 
 function asetaKyna(x, y) {
   kyna.setAttribute('transform', `translate(${x.toFixed(1)} ${y.toFixed(1)})`);
+}
+
+// --- kävijän kynä ------------------------------------------------------------------------------------------
+
+let veto = null; // meneillään oleva piirto: { g, viivat, viiva, laatikko, pituus, alueet, piirto }
+
+function korttiAlueet() {
+  const r = ASETUKSET.korttireunus;
+  return [...document.querySelectorAll(KORTIT)].map((e) => {
+    const b = e.getBoundingClientRect();
+    return { x1: b.left - r, y1: b.top - r, x2: b.right + r, y2: b.bottom + r };
+  });
+}
+
+const sisalla = (x, y, alueet) => alueet.some((a) => x > a.x1 && x < a.x2 && y > a.y1 && y < a.y2);
+
+function kavijanKyna() {
+  document.documentElement.classList.add('voi-piirtaa');
+  document.addEventListener('pointerdown', alkaa);
+}
+
+function alkaa(e) {
+  if (veto || e.button !== 0 || !e.isPrimary || e.pointerType === 'touch') return;
+  if (!(e.target instanceof Element) || e.target.closest(EI_ALOITUSTA)) return;
+  const alueet = korttiAlueet();
+  if (sisalla(e.clientX, e.clientY, alueet)) return;
+  e.preventDefault(); // ei tekstin valintaa eikä kuvan raahausta
+  try {
+    document.body.setPointerCapture(e.pointerId);
+  } catch {}
+
+  const g = el('g', { class: 'kavija' });
+  kerros.insertBefore(g, kyna);
+  veto = { g, viivat: [], viiva: null, alueet, pituus: 0, viimeinen: [e.clientX, e.clientY], laatikko: { x1: e.clientX, y1: e.clientY, x2: e.clientX, y2: e.clientY } };
+  uusiViiva(e.clientX, e.clientY);
+  window.addEventListener('pointermove', liikkuu);
+  window.addEventListener('pointerup', loppuu);
+  window.addEventListener('pointercancel', loppuu);
+  window.addEventListener('blur', loppuu);
+}
+
+function uusiViiva(x, y) {
+  const p = el('path');
+  veto.g.appendChild(p);
+  veto.viiva = { p, pisteet: [[x, y]] };
+  veto.viivat.push(veto.viiva);
+  piirraVeto();
+}
+
+function liikkuu(e) {
+  if (!veto) return;
+  const tapahtumat = (e.getCoalescedEvents && e.getCoalescedEvents()) || [e];
+  const naytteet = [];
+  for (const t of tapahtumat.length ? tapahtumat : [e]) {
+    // Pitkä hyppy jaetaan pieniin askeliin, jotta viiva katkeaa tarkasti kortin reunalla.
+    const [lx, ly] = veto.viimeinen;
+    const askelia = Math.max(1, Math.ceil(Math.hypot(t.clientX - lx, t.clientY - ly) / 4));
+    for (let i = 1; i <= askelia; i++) naytteet.push([lx + ((t.clientX - lx) * i) / askelia, ly + ((t.clientY - ly) * i) / askelia]);
+    veto.viimeinen = [t.clientX, t.clientY];
+  }
+  for (const [x, y] of naytteet) {
+    if (sisalla(x, y, veto.alueet)) {
+      veto.viiva = null; // viiva katkeaa kortin kohdalla ja jatkuu sen jälkeen
+      continue;
+    }
+    if (!veto.viiva) {
+      uusiViiva(x, y);
+      continue;
+    }
+    const pisteet = veto.viiva.pisteet;
+    const [px, py] = pisteet[pisteet.length - 1];
+    const d = Math.hypot(x - px, y - py);
+    if (d < 2) continue;
+    pisteet.push([x, y]);
+    veto.pituus += d;
+    const l = veto.laatikko;
+    l.x1 = Math.min(l.x1, x);
+    l.y1 = Math.min(l.y1, y);
+    l.x2 = Math.max(l.x2, x);
+    l.y2 = Math.max(l.y2, y);
+  }
+  piirraVeto();
+}
+
+let vetoKehys = 0;
+function piirraVeto() {
+  if (vetoKehys) return;
+  vetoKehys = requestAnimationFrame(() => {
+    vetoKehys = 0;
+    if (veto && veto.viiva) veto.viiva.p.setAttribute('d', polku(veto.viiva.pisteet));
+  });
+}
+
+function loppuu() {
+  if (!veto) return;
+  window.removeEventListener('pointermove', liikkuu);
+  window.removeEventListener('pointerup', loppuu);
+  window.removeEventListener('pointercancel', loppuu);
+  window.removeEventListener('blur', loppuu);
+  const v = veto;
+  veto = null;
+  cancelAnimationFrame(vetoKehys);
+  vetoKehys = 0;
+  for (const viiva of v.viivat) viiva.p.setAttribute('d', polku(viiva.pisteet));
+  if (v.pituus < 4) {
+    v.g.remove(); // pelkkä napsautus
+    return;
+  }
+  piirretyt.push({ g: v.g, laatikko: v.laatikko, tyyppi: 'kavija', viivat: v.viivat.map((x) => x.pisteet) });
+  karsi();
+  naytaOhjaimet();
+}
+
+// Pitää kävijän viivojen määrän kohtuullisena: vanhimmat häipyvät ensin.
+function karsi() {
+  let viivoja = piirretyt.reduce((n, p) => n + (p.tyyppi === 'kavija' ? p.viivat.length : 0), 0);
+  for (let i = 0; i < piirretyt.length && viivoja > ASETUKSET.enintaanViivoja; ) {
+    if (piirretyt[i].tyyppi === 'kavija') {
+      viivoja -= piirretyt[i].viivat.length;
+      hayta(i);
+    } else i++;
+  }
+}
+
+// --- vihje ja painikkeet alatunnisteessa -------------------------------------------------------------------
+
+function teeOhjaimet() {
+  const wrap = document.querySelector('footer .wrap');
+  if (!wrap) return;
+  ohjaimet = document.createElement('span');
+  ohjaimet.className = 'ohjaimet';
+  const vihje = document.createElement('span');
+  vihje.className = 'vihje hand';
+  vihje.textContent = 'Saat piirtää sinäkin';
+  const pyyhi = nappi('pyyhi', 'Pyyhi piirrokset', () => {
+    for (let i = piirretyt.length - 1; i >= 0; i--) hayta(i);
+  });
+  const hiljaaNappi = nappi('hiljaa', 'Pysäytä piirtäjä', () => {
+    hiljaa = !hiljaa;
+    hiljaaNappi.textContent = hiljaa ? 'jatka' : 'hiljaa';
+    hiljaaNappi.setAttribute('aria-label', hiljaa ? 'Jatka piirtäjää' : 'Pysäytä piirtäjä');
+    if (hiljaa) {
+      ajastin.tauota();
+      ajastin.fn = null;
+    } else if (maara < ASETUKSET.enintaan) ajastin.aseta(seuraava, 1500);
+  });
+  ohjaimet.append(vihje, pyyhi, hiljaaNappi);
+  wrap.insertBefore(ohjaimet, wrap.lastElementChild);
+}
+
+function nappi(teksti, nimi, fn) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.textContent = teksti;
+  b.setAttribute('aria-label', nimi);
+  b.addEventListener('click', fn);
+  return b;
+}
+
+function naytaOhjaimet() {
+  if (ohjaimet) ohjaimet.classList.add('nakyy');
 }
