@@ -17,6 +17,7 @@ const ASETUKSET = {
   heilunta: 0.45, // px käsialan heilunta
   korttireunus: 6, // px: kävijän viiva katkeaa näin lähellä korttia
   enintaanViivoja: 300, // kävijän viivoja sivulla; vanhimmat häivytetään
+  ohjaimet: false, // alatunnisteen vihje sekä pyyhi- ja hiljaa-painikkeet; piilotettu toistaiseksi
 };
 
 const SUOJATUT = '.choice, header .logo, header small, footer .wrap > *';
@@ -474,6 +475,7 @@ function karsi() {
 // --- vihje ja painikkeet alatunnisteessa -------------------------------------------------------------------
 
 function teeOhjaimet() {
+  if (!ASETUKSET.ohjaimet) return;
   const wrap = document.querySelector('footer .wrap');
   if (!wrap) return;
   ohjaimet = document.createElement('span');
