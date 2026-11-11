@@ -77,6 +77,17 @@ footer a{color:inherit}
 #doodles .kyna{opacity:0;transition:opacity .4s ease}
 #doodles .kyna.nakyy{opacity:1}
 header,main,footer{position:relative;z-index:1}
+/* Kävijän kynä: musta, kuten piirtäjälläkin. Korttien päällä tavallinen osoitin. */
+#doodles .kavija{fill:none;stroke:#1B1D20;stroke-width:3;stroke-opacity:.9;stroke-linecap:round;stroke-linejoin:round;transition:opacity .6s ease}
+#doodles .kavija.pois{opacity:0}
+.voi-piirtaa .page{cursor:url(/doodle/kyna.svg) 3 29,crosshair}
+.voi-piirtaa header .wrap>*,.voi-piirtaa footer .wrap>*{cursor:auto}
+.voi-piirtaa .choice,.voi-piirtaa a,.voi-piirtaa button{cursor:pointer}
+.ohjaimet{display:inline-flex;align-items:baseline;gap:14px;opacity:0;visibility:hidden;transition:opacity .6s ease,visibility .6s}
+.ohjaimet.nakyy{opacity:1;visibility:visible}
+.ohjaimet .vihje{font-size:21px;line-height:1;color:var(--pen)}
+.ohjaimet button{background:none;border:0;padding:0;font:inherit;color:var(--soft);text-decoration:underline;text-underline-offset:3px}
+.ohjaimet button:hover{color:var(--pen)}
 @media print{#doodles{display:none}}
 </style>
 </head>
